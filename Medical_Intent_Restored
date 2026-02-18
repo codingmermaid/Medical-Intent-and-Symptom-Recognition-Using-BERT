@@ -1,0 +1,1790 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "id": "3cc98ace-98ed-4dc3-aa4e-145a6ff08003",
+   "metadata": {
+    "include-cell-in-app": true
+   },
+   "source": [
+    "## Project Scope ##\n",
+    "\n",
+    "The goal of this master's project is to create a system that is part of some bigger medical system like a chatbot and it can read the input of potential patients in natural language, and then recognize the medical intent and symptoms. Since BERT is only an encoder model, we can't expect it to generate the extensive result. If there's a need to extend this chatbot we can use some open-source AI model like LLAMA-3 or Mistral AI.\n",
+    "\n",
+    "First, let's load the libraries we need as well as load the data we'll use."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "id": "3ebe3f08-40a7-4744-84de-3af34abdc8ac",
+   "metadata": {
+    "include-cell-in-app": true
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Requirement already satisfied: torch in /Users/danicasimic/torch_env/lib/python3.12/site-packages (2.8.0)\n",
+      "Requirement already satisfied: torchvision in /Users/danicasimic/torch_env/lib/python3.12/site-packages (0.23.0)\n",
+      "Requirement already satisfied: torchaudio in /Users/danicasimic/torch_env/lib/python3.12/site-packages (2.8.0)\n",
+      "Requirement already satisfied: transformers in /Users/danicasimic/torch_env/lib/python3.12/site-packages (4.57.0)\n",
+      "Requirement already satisfied: pandas in /Users/danicasimic/torch_env/lib/python3.12/site-packages (2.3.3)\n",
+      "Requirement already satisfied: numpy in /Users/danicasimic/torch_env/lib/python3.12/site-packages (2.3.3)\n",
+      "Requirement already satisfied: matplotlib in /Users/danicasimic/torch_env/lib/python3.12/site-packages (3.10.6)\n",
+      "Requirement already satisfied: scikit-learn in /Users/danicasimic/torch_env/lib/python3.12/site-packages (1.7.2)\n",
+      "Requirement already satisfied: jupyter in /Users/danicasimic/torch_env/lib/python3.12/site-packages (1.1.1)\n",
+      "Requirement already satisfied: filelock in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from torch) (3.19.1)\n",
+      "Requirement already satisfied: typing-extensions>=4.10.0 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from torch) (4.15.0)\n",
+      "Requirement already satisfied: setuptools in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from torch) (80.9.0)\n",
+      "Requirement already satisfied: sympy>=1.13.3 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from torch) (1.14.0)\n",
+      "Requirement already satisfied: networkx in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from torch) (3.5)\n",
+      "Requirement already satisfied: jinja2 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from torch) (3.1.6)\n",
+      "Requirement already satisfied: fsspec in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from torch) (2025.9.0)\n",
+      "Requirement already satisfied: pillow!=8.3.*,>=5.3.0 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from torchvision) (11.3.0)\n",
+      "Requirement already satisfied: huggingface-hub<1.0,>=0.34.0 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from transformers) (0.35.3)\n",
+      "Requirement already satisfied: packaging>=20.0 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from transformers) (25.0)\n",
+      "Requirement already satisfied: pyyaml>=5.1 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from transformers) (6.0.3)\n",
+      "Requirement already satisfied: regex!=2019.12.17 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from transformers) (2025.9.18)\n",
+      "Requirement already satisfied: requests in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from transformers) (2.32.5)\n",
+      "Requirement already satisfied: tokenizers<=0.23.0,>=0.22.0 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from transformers) (0.22.1)\n",
+      "Requirement already satisfied: safetensors>=0.4.3 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from transformers) (0.6.2)\n",
+      "Requirement already satisfied: tqdm>=4.27 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from transformers) (4.67.1)\n",
+      "Requirement already satisfied: hf-xet<2.0.0,>=1.1.3 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from huggingface-hub<1.0,>=0.34.0->transformers) (1.1.10)\n",
+      "Requirement already satisfied: python-dateutil>=2.8.2 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from pandas) (2.9.0.post0)\n",
+      "Requirement already satisfied: pytz>=2020.1 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from pandas) (2025.2)\n",
+      "Requirement already satisfied: tzdata>=2022.7 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from pandas) (2025.2)\n",
+      "Requirement already satisfied: contourpy>=1.0.1 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from matplotlib) (1.3.3)\n",
+      "Requirement already satisfied: cycler>=0.10 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from matplotlib) (0.12.1)\n",
+      "Requirement already satisfied: fonttools>=4.22.0 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from matplotlib) (4.60.1)\n",
+      "Requirement already satisfied: kiwisolver>=1.3.1 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from matplotlib) (1.4.9)\n",
+      "Requirement already satisfied: pyparsing>=2.3.1 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from matplotlib) (3.2.5)\n",
+      "Requirement already satisfied: scipy>=1.8.0 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from scikit-learn) (1.16.2)\n",
+      "Requirement already satisfied: joblib>=1.2.0 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from scikit-learn) (1.5.2)\n",
+      "Requirement already satisfied: threadpoolctl>=3.1.0 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from scikit-learn) (3.6.0)\n",
+      "Requirement already satisfied: notebook in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from jupyter) (7.4.7)\n",
+      "Requirement already satisfied: jupyter-console in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from jupyter) (6.6.3)\n",
+      "Requirement already satisfied: nbconvert in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from jupyter) (7.16.6)\n",
+      "Requirement already satisfied: ipykernel in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from jupyter) (6.30.1)\n",
+      "Requirement already satisfied: ipywidgets in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from jupyter) (8.1.8)\n",
+      "Requirement already satisfied: jupyterlab in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from jupyter) (4.4.9)\n",
+      "Requirement already satisfied: six>=1.5 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from python-dateutil>=2.8.2->pandas) (1.17.0)\n",
+      "Requirement already satisfied: mpmath<1.4,>=1.1.0 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from sympy>=1.13.3->torch) (1.3.0)\n",
+      "Requirement already satisfied: appnope>=0.1.2 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from ipykernel->jupyter) (0.1.4)\n",
+      "Requirement already satisfied: comm>=0.1.1 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from ipykernel->jupyter) (0.2.3)\n",
+      "Requirement already satisfied: debugpy>=1.6.5 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from ipykernel->jupyter) (1.8.17)\n",
+      "Requirement already satisfied: ipython>=7.23.1 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from ipykernel->jupyter) (9.6.0)\n",
+      "Requirement already satisfied: jupyter-client>=8.0.0 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from ipykernel->jupyter) (8.6.3)\n",
+      "Requirement already satisfied: jupyter-core!=5.0.*,>=4.12 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from ipykernel->jupyter) (5.8.1)\n",
+      "Requirement already satisfied: matplotlib-inline>=0.1 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from ipykernel->jupyter) (0.1.7)\n",
+      "Requirement already satisfied: nest-asyncio>=1.4 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from ipykernel->jupyter) (1.6.0)\n",
+      "Requirement already satisfied: psutil>=5.7 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from ipykernel->jupyter) (7.1.0)\n",
+      "Requirement already satisfied: pyzmq>=25 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from ipykernel->jupyter) (27.1.0)\n",
+      "Requirement already satisfied: tornado>=6.2 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from ipykernel->jupyter) (6.5.2)\n",
+      "Requirement already satisfied: traitlets>=5.4.0 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from ipykernel->jupyter) (5.14.3)\n",
+      "Requirement already satisfied: decorator in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from ipython>=7.23.1->ipykernel->jupyter) (5.2.1)\n",
+      "Requirement already satisfied: ipython-pygments-lexers in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from ipython>=7.23.1->ipykernel->jupyter) (1.1.1)\n",
+      "Requirement already satisfied: jedi>=0.16 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from ipython>=7.23.1->ipykernel->jupyter) (0.19.2)\n",
+      "Requirement already satisfied: pexpect>4.3 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from ipython>=7.23.1->ipykernel->jupyter) (4.9.0)\n",
+      "Requirement already satisfied: prompt_toolkit<3.1.0,>=3.0.41 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from ipython>=7.23.1->ipykernel->jupyter) (3.0.52)\n",
+      "Requirement already satisfied: pygments>=2.4.0 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from ipython>=7.23.1->ipykernel->jupyter) (2.19.2)\n",
+      "Requirement already satisfied: stack_data in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from ipython>=7.23.1->ipykernel->jupyter) (0.6.3)\n",
+      "Requirement already satisfied: wcwidth in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from prompt_toolkit<3.1.0,>=3.0.41->ipython>=7.23.1->ipykernel->jupyter) (0.2.14)\n",
+      "Requirement already satisfied: parso<0.9.0,>=0.8.4 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from jedi>=0.16->ipython>=7.23.1->ipykernel->jupyter) (0.8.5)\n",
+      "Requirement already satisfied: platformdirs>=2.5 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from jupyter-core!=5.0.*,>=4.12->ipykernel->jupyter) (4.4.0)\n",
+      "Requirement already satisfied: ptyprocess>=0.5 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from pexpect>4.3->ipython>=7.23.1->ipykernel->jupyter) (0.7.0)\n",
+      "Requirement already satisfied: widgetsnbextension~=4.0.14 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from ipywidgets->jupyter) (4.0.15)\n",
+      "Requirement already satisfied: jupyterlab_widgets~=3.0.15 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from ipywidgets->jupyter) (3.0.16)\n",
+      "Requirement already satisfied: MarkupSafe>=2.0 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from jinja2->torch) (3.0.3)\n",
+      "Requirement already satisfied: async-lru>=1.0.0 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from jupyterlab->jupyter) (2.0.5)\n",
+      "Requirement already satisfied: httpx<1,>=0.25.0 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from jupyterlab->jupyter) (0.28.1)\n",
+      "Requirement already satisfied: jupyter-lsp>=2.0.0 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from jupyterlab->jupyter) (2.3.0)\n",
+      "Requirement already satisfied: jupyter-server<3,>=2.4.0 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from jupyterlab->jupyter) (2.17.0)\n",
+      "Requirement already satisfied: jupyterlab-server<3,>=2.27.1 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from jupyterlab->jupyter) (2.27.3)\n",
+      "Requirement already satisfied: notebook-shim>=0.2 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from jupyterlab->jupyter) (0.2.4)\n",
+      "Requirement already satisfied: anyio in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from httpx<1,>=0.25.0->jupyterlab->jupyter) (4.11.0)\n",
+      "Requirement already satisfied: certifi in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from httpx<1,>=0.25.0->jupyterlab->jupyter) (2025.10.5)\n",
+      "Requirement already satisfied: httpcore==1.* in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from httpx<1,>=0.25.0->jupyterlab->jupyter) (1.0.9)\n",
+      "Requirement already satisfied: idna in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from httpx<1,>=0.25.0->jupyterlab->jupyter) (3.10)\n",
+      "Requirement already satisfied: h11>=0.16 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from httpcore==1.*->httpx<1,>=0.25.0->jupyterlab->jupyter) (0.16.0)\n",
+      "Requirement already satisfied: argon2-cffi>=21.1 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from jupyter-server<3,>=2.4.0->jupyterlab->jupyter) (25.1.0)\n",
+      "Requirement already satisfied: jupyter-events>=0.11.0 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from jupyter-server<3,>=2.4.0->jupyterlab->jupyter) (0.12.0)\n",
+      "Requirement already satisfied: jupyter-server-terminals>=0.4.4 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from jupyter-server<3,>=2.4.0->jupyterlab->jupyter) (0.5.3)\n",
+      "Requirement already satisfied: nbformat>=5.3.0 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from jupyter-server<3,>=2.4.0->jupyterlab->jupyter) (5.10.4)\n",
+      "Requirement already satisfied: prometheus-client>=0.9 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from jupyter-server<3,>=2.4.0->jupyterlab->jupyter) (0.23.1)\n",
+      "Requirement already satisfied: send2trash>=1.8.2 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from jupyter-server<3,>=2.4.0->jupyterlab->jupyter) (1.8.3)\n",
+      "Requirement already satisfied: terminado>=0.8.3 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from jupyter-server<3,>=2.4.0->jupyterlab->jupyter) (0.18.1)\n",
+      "Requirement already satisfied: websocket-client>=1.7 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from jupyter-server<3,>=2.4.0->jupyterlab->jupyter) (1.8.0)\n",
+      "Requirement already satisfied: babel>=2.10 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from jupyterlab-server<3,>=2.27.1->jupyterlab->jupyter) (2.17.0)\n",
+      "Requirement already satisfied: json5>=0.9.0 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from jupyterlab-server<3,>=2.27.1->jupyterlab->jupyter) (0.12.1)\n",
+      "Requirement already satisfied: jsonschema>=4.18.0 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from jupyterlab-server<3,>=2.27.1->jupyterlab->jupyter) (4.25.1)\n",
+      "Requirement already satisfied: sniffio>=1.1 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from anyio->httpx<1,>=0.25.0->jupyterlab->jupyter) (1.3.1)\n",
+      "Requirement already satisfied: argon2-cffi-bindings in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from argon2-cffi>=21.1->jupyter-server<3,>=2.4.0->jupyterlab->jupyter) (25.1.0)\n",
+      "Requirement already satisfied: attrs>=22.2.0 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from jsonschema>=4.18.0->jupyterlab-server<3,>=2.27.1->jupyterlab->jupyter) (25.4.0)\n",
+      "Requirement already satisfied: jsonschema-specifications>=2023.03.6 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from jsonschema>=4.18.0->jupyterlab-server<3,>=2.27.1->jupyterlab->jupyter) (2025.9.1)\n",
+      "Requirement already satisfied: referencing>=0.28.4 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from jsonschema>=4.18.0->jupyterlab-server<3,>=2.27.1->jupyterlab->jupyter) (0.36.2)\n",
+      "Requirement already satisfied: rpds-py>=0.7.1 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from jsonschema>=4.18.0->jupyterlab-server<3,>=2.27.1->jupyterlab->jupyter) (0.27.1)\n",
+      "Requirement already satisfied: python-json-logger>=2.0.4 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from jupyter-events>=0.11.0->jupyter-server<3,>=2.4.0->jupyterlab->jupyter) (4.0.0)\n",
+      "Requirement already satisfied: rfc3339-validator in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from jupyter-events>=0.11.0->jupyter-server<3,>=2.4.0->jupyterlab->jupyter) (0.1.4)\n",
+      "Requirement already satisfied: rfc3986-validator>=0.1.1 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from jupyter-events>=0.11.0->jupyter-server<3,>=2.4.0->jupyterlab->jupyter) (0.1.1)\n",
+      "Requirement already satisfied: fqdn in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from jsonschema[format-nongpl]>=4.18.0->jupyter-events>=0.11.0->jupyter-server<3,>=2.4.0->jupyterlab->jupyter) (1.5.1)\n",
+      "Requirement already satisfied: isoduration in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from jsonschema[format-nongpl]>=4.18.0->jupyter-events>=0.11.0->jupyter-server<3,>=2.4.0->jupyterlab->jupyter) (20.11.0)\n",
+      "Requirement already satisfied: jsonpointer>1.13 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from jsonschema[format-nongpl]>=4.18.0->jupyter-events>=0.11.0->jupyter-server<3,>=2.4.0->jupyterlab->jupyter) (3.0.0)\n",
+      "Requirement already satisfied: rfc3987-syntax>=1.1.0 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from jsonschema[format-nongpl]>=4.18.0->jupyter-events>=0.11.0->jupyter-server<3,>=2.4.0->jupyterlab->jupyter) (1.1.0)\n",
+      "Requirement already satisfied: uri-template in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from jsonschema[format-nongpl]>=4.18.0->jupyter-events>=0.11.0->jupyter-server<3,>=2.4.0->jupyterlab->jupyter) (1.3.0)\n",
+      "Requirement already satisfied: webcolors>=24.6.0 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from jsonschema[format-nongpl]>=4.18.0->jupyter-events>=0.11.0->jupyter-server<3,>=2.4.0->jupyterlab->jupyter) (24.11.1)\n",
+      "Requirement already satisfied: beautifulsoup4 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from nbconvert->jupyter) (4.14.2)\n",
+      "Requirement already satisfied: bleach!=5.0.0 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from bleach[css]!=5.0.0->nbconvert->jupyter) (6.2.0)\n",
+      "Requirement already satisfied: defusedxml in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from nbconvert->jupyter) (0.7.1)\n",
+      "Requirement already satisfied: jupyterlab-pygments in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from nbconvert->jupyter) (0.3.0)\n",
+      "Requirement already satisfied: mistune<4,>=2.0.3 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from nbconvert->jupyter) (3.1.4)\n",
+      "Requirement already satisfied: nbclient>=0.5.0 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from nbconvert->jupyter) (0.10.2)\n",
+      "Requirement already satisfied: pandocfilters>=1.4.1 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from nbconvert->jupyter) (1.5.1)\n",
+      "Requirement already satisfied: webencodings in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from bleach!=5.0.0->bleach[css]!=5.0.0->nbconvert->jupyter) (0.5.1)\n",
+      "Requirement already satisfied: tinycss2<1.5,>=1.1.0 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from bleach[css]!=5.0.0->nbconvert->jupyter) (1.4.0)\n",
+      "Requirement already satisfied: fastjsonschema>=2.15 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from nbformat>=5.3.0->jupyter-server<3,>=2.4.0->jupyterlab->jupyter) (2.21.2)\n",
+      "Requirement already satisfied: charset_normalizer<4,>=2 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from requests->transformers) (3.4.3)\n",
+      "Requirement already satisfied: urllib3<3,>=1.21.1 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from requests->transformers) (2.5.0)\n",
+      "Requirement already satisfied: lark>=1.2.2 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from rfc3987-syntax>=1.1.0->jsonschema[format-nongpl]>=4.18.0->jupyter-events>=0.11.0->jupyter-server<3,>=2.4.0->jupyterlab->jupyter) (1.3.0)\n",
+      "Requirement already satisfied: cffi>=1.0.1 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from argon2-cffi-bindings->argon2-cffi>=21.1->jupyter-server<3,>=2.4.0->jupyterlab->jupyter) (2.0.0)\n",
+      "Requirement already satisfied: pycparser in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from cffi>=1.0.1->argon2-cffi-bindings->argon2-cffi>=21.1->jupyter-server<3,>=2.4.0->jupyterlab->jupyter) (2.23)\n",
+      "Requirement already satisfied: soupsieve>1.2 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from beautifulsoup4->nbconvert->jupyter) (2.8)\n",
+      "Requirement already satisfied: arrow>=0.15.0 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from isoduration->jsonschema[format-nongpl]>=4.18.0->jupyter-events>=0.11.0->jupyter-server<3,>=2.4.0->jupyterlab->jupyter) (1.3.0)\n",
+      "Requirement already satisfied: types-python-dateutil>=2.8.10 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from arrow>=0.15.0->isoduration->jsonschema[format-nongpl]>=4.18.0->jupyter-events>=0.11.0->jupyter-server<3,>=2.4.0->jupyterlab->jupyter) (2.9.0.20250822)\n",
+      "Requirement already satisfied: executing>=1.2.0 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from stack_data->ipython>=7.23.1->ipykernel->jupyter) (2.2.1)\n",
+      "Requirement already satisfied: asttokens>=2.1.0 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from stack_data->ipython>=7.23.1->ipykernel->jupyter) (3.0.0)\n",
+      "Requirement already satisfied: pure-eval in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from stack_data->ipython>=7.23.1->ipykernel->jupyter) (0.2.3)\n",
+      "\n",
+      "\u001b[1m[\u001b[0m\u001b[34;49mnotice\u001b[0m\u001b[1;39;49m]\u001b[0m\u001b[39;49m A new release of pip is available: \u001b[0m\u001b[31;49m25.2\u001b[0m\u001b[39;49m -> \u001b[0m\u001b[32;49m26.0.1\u001b[0m\n",
+      "\u001b[1m[\u001b[0m\u001b[34;49mnotice\u001b[0m\u001b[1;39;49m]\u001b[0m\u001b[39;49m To update, run: \u001b[0m\u001b[32;49m/Users/danicasimic/torch_env/bin/python -m pip install --upgrade pip\u001b[0m\n",
+      "Note: you may need to restart the kernel to use updated packages.\n"
+     ]
+    }
+   ],
+   "source": [
+    "pip install torch torchvision torchaudio transformers pandas numpy matplotlib scikit-learn matplotlib jupyter\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "id": "9970abfb-3515-4912-85ef-b8292d1c05b9",
+   "metadata": {
+    "include-cell-in-app": true
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "PyTorch version: 2.8.0\n",
+      "MPS available: True\n",
+      "MPS built: True\n"
+     ]
+    }
+   ],
+   "source": [
+    "import torch\n",
+    "print(\"PyTorch version:\", torch.__version__)\n",
+    "print(\"MPS available:\", torch.backends.mps.is_available())\n",
+    "print(\"MPS built:\", torch.backends.mps.is_built())"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "id": "9022fa51-98e0-43f0-a2e3-1b9394ed9bb5",
+   "metadata": {
+    "include-cell-in-app": true
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Requirement already satisfied: pip in /opt/anaconda3/lib/python3.12/site-packages (26.0.1)\n",
+      "Requirement already satisfied: setuptools in /opt/anaconda3/lib/python3.12/site-packages (82.0.0)\n",
+      "Requirement already satisfied: wheel in /opt/anaconda3/lib/python3.12/site-packages (0.46.3)\n",
+      "Requirement already satisfied: packaging>=24.0 in /opt/anaconda3/lib/python3.12/site-packages (from wheel) (26.0)\n",
+      "Requirement already satisfied: seaborn in /opt/anaconda3/lib/python3.12/site-packages (0.13.2)\n",
+      "Requirement already satisfied: numpy!=1.24.0,>=1.20 in /opt/anaconda3/lib/python3.12/site-packages (from seaborn) (1.26.4)\n",
+      "Requirement already satisfied: pandas>=1.2 in /opt/anaconda3/lib/python3.12/site-packages (from seaborn) (2.2.1)\n",
+      "Requirement already satisfied: matplotlib!=3.6.1,>=3.4 in /opt/anaconda3/lib/python3.12/site-packages (from seaborn) (3.8.4)\n",
+      "Requirement already satisfied: contourpy>=1.0.1 in /opt/anaconda3/lib/python3.12/site-packages (from matplotlib!=3.6.1,>=3.4->seaborn) (1.2.0)\n",
+      "Requirement already satisfied: cycler>=0.10 in /opt/anaconda3/lib/python3.12/site-packages (from matplotlib!=3.6.1,>=3.4->seaborn) (0.11.0)\n",
+      "Requirement already satisfied: fonttools>=4.22.0 in /opt/anaconda3/lib/python3.12/site-packages (from matplotlib!=3.6.1,>=3.4->seaborn) (4.51.0)\n",
+      "Requirement already satisfied: kiwisolver>=1.3.1 in /opt/anaconda3/lib/python3.12/site-packages (from matplotlib!=3.6.1,>=3.4->seaborn) (1.4.4)\n",
+      "Requirement already satisfied: packaging>=20.0 in /opt/anaconda3/lib/python3.12/site-packages (from matplotlib!=3.6.1,>=3.4->seaborn) (26.0)\n",
+      "Requirement already satisfied: pillow>=8 in /opt/anaconda3/lib/python3.12/site-packages (from matplotlib!=3.6.1,>=3.4->seaborn) (10.3.0)\n",
+      "Requirement already satisfied: pyparsing>=2.3.1 in /opt/anaconda3/lib/python3.12/site-packages (from matplotlib!=3.6.1,>=3.4->seaborn) (3.0.9)\n",
+      "Requirement already satisfied: python-dateutil>=2.7 in /opt/anaconda3/lib/python3.12/site-packages (from matplotlib!=3.6.1,>=3.4->seaborn) (2.9.0.post0)\n",
+      "Requirement already satisfied: pytz>=2020.1 in /opt/anaconda3/lib/python3.12/site-packages (from pandas>=1.2->seaborn) (2024.1)\n",
+      "Requirement already satisfied: tzdata>=2022.7 in /opt/anaconda3/lib/python3.12/site-packages (from pandas>=1.2->seaborn) (2023.3)\n",
+      "Requirement already satisfied: six>=1.5 in /opt/anaconda3/lib/python3.12/site-packages (from python-dateutil>=2.7->matplotlib!=3.6.1,>=3.4->seaborn) (1.16.0)\n"
+     ]
+    }
+   ],
+   "source": [
+    "!python -m pip install --upgrade pip setuptools wheel\n",
+    "!python -m pip install seaborn\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 7,
+   "id": "c519acd8-4d15-407e-b108-df95a50a6b1a",
+   "metadata": {
+    "include-cell-in-app": true
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Requirement already satisfied: transformers in /opt/anaconda3/lib/python3.12/site-packages (4.57.0)\n",
+      "Requirement already satisfied: filelock in /opt/anaconda3/lib/python3.12/site-packages (from transformers) (3.13.1)\n",
+      "Requirement already satisfied: huggingface-hub<1.0,>=0.34.0 in /opt/anaconda3/lib/python3.12/site-packages (from transformers) (0.35.3)\n",
+      "Requirement already satisfied: numpy>=1.17 in /opt/anaconda3/lib/python3.12/site-packages (from transformers) (1.26.4)\n",
+      "Requirement already satisfied: packaging>=20.0 in /opt/anaconda3/lib/python3.12/site-packages (from transformers) (26.0)\n",
+      "Requirement already satisfied: pyyaml>=5.1 in /opt/anaconda3/lib/python3.12/site-packages (from transformers) (6.0.1)\n",
+      "Requirement already satisfied: regex!=2019.12.17 in /opt/anaconda3/lib/python3.12/site-packages (from transformers) (2023.10.3)\n",
+      "Requirement already satisfied: requests in /opt/anaconda3/lib/python3.12/site-packages (from transformers) (2.32.2)\n",
+      "Requirement already satisfied: tokenizers<=0.23.0,>=0.22.0 in /opt/anaconda3/lib/python3.12/site-packages (from transformers) (0.22.1)\n",
+      "Requirement already satisfied: safetensors>=0.4.3 in /opt/anaconda3/lib/python3.12/site-packages (from transformers) (0.6.2)\n",
+      "Requirement already satisfied: tqdm>=4.27 in /opt/anaconda3/lib/python3.12/site-packages (from transformers) (4.66.4)\n",
+      "Requirement already satisfied: fsspec>=2023.5.0 in /opt/anaconda3/lib/python3.12/site-packages (from huggingface-hub<1.0,>=0.34.0->transformers) (2024.3.1)\n",
+      "Requirement already satisfied: typing-extensions>=3.7.4.3 in /opt/anaconda3/lib/python3.12/site-packages (from huggingface-hub<1.0,>=0.34.0->transformers) (4.15.0)\n",
+      "Requirement already satisfied: hf-xet<2.0.0,>=1.1.3 in /opt/anaconda3/lib/python3.12/site-packages (from huggingface-hub<1.0,>=0.34.0->transformers) (1.1.10)\n",
+      "Requirement already satisfied: charset-normalizer<4,>=2 in /opt/anaconda3/lib/python3.12/site-packages (from requests->transformers) (2.0.4)\n",
+      "Requirement already satisfied: idna<4,>=2.5 in /opt/anaconda3/lib/python3.12/site-packages (from requests->transformers) (3.7)\n",
+      "Requirement already satisfied: urllib3<3,>=1.21.1 in /opt/anaconda3/lib/python3.12/site-packages (from requests->transformers) (2.2.2)\n",
+      "Requirement already satisfied: certifi>=2017.4.17 in /opt/anaconda3/lib/python3.12/site-packages (from requests->transformers) (2024.8.30)\n"
+     ]
+    }
+   ],
+   "source": [
+    "!pip install transformers\n",
+    "import numpy as np\n",
+    "import pandas as pd\n",
+    "import seaborn as sns\n",
+    "import matplotlib.pyplot as plt"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 8,
+   "id": "524f2285-8c16-4567-92d1-94c051af3efe",
+   "metadata": {
+    "include-cell-in-app": true
+   },
+   "outputs": [
+    {
+     "data": {
+      "text/html": [
+       "<div>\n",
+       "<style scoped>\n",
+       "    .dataframe tbody tr th:only-of-type {\n",
+       "        vertical-align: middle;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe tbody tr th {\n",
+       "        vertical-align: top;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe thead th {\n",
+       "        text-align: right;\n",
+       "    }\n",
+       "</style>\n",
+       "<table border=\"1\" class=\"dataframe\">\n",
+       "  <thead>\n",
+       "    <tr style=\"text-align: right;\">\n",
+       "      <th></th>\n",
+       "      <th>phrase</th>\n",
+       "      <th>prompt</th>\n",
+       "    </tr>\n",
+       "  </thead>\n",
+       "  <tbody>\n",
+       "    <tr>\n",
+       "      <th>4234</th>\n",
+       "      <td>My face has broken out in painful red spots an...</td>\n",
+       "      <td>Acne</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>5432</th>\n",
+       "      <td>I feel pain in the lower back</td>\n",
+       "      <td>Back pain</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>3752</th>\n",
+       "      <td>i can't breath because of  Cough</td>\n",
+       "      <td>Cough</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>4661</th>\n",
+       "      <td>After a breakup  I feel something strange in me.</td>\n",
+       "      <td>Emotional pain</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>1845</th>\n",
+       "      <td>When I stand up too quickly I feel as though I...</td>\n",
+       "      <td>Feeling dizzy</td>\n",
+       "    </tr>\n",
+       "  </tbody>\n",
+       "</table>\n",
+       "</div>"
+      ],
+      "text/plain": [
+       "                                                 phrase          prompt\n",
+       "4234  My face has broken out in painful red spots an...            Acne\n",
+       "5432                      I feel pain in the lower back       Back pain\n",
+       "3752                   i can't breath because of  Cough           Cough\n",
+       "4661   After a breakup  I feel something strange in me.  Emotional pain\n",
+       "1845  When I stand up too quickly I feel as though I...   Feeling dizzy"
+      ]
+     },
+     "execution_count": 8,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "data = pd.read_csv('data.csv')\n",
+    "data1 = data[['phrase','prompt']]\n",
+    "data1.sample(5)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 11,
+   "id": "ee72dcaf-ef63-4ace-87e2-7e7f88872a4e",
+   "metadata": {
+    "include-cell-in-app": true
+   },
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "phrase    0\n",
+       "prompt    0\n",
+       "dtype: int64"
+      ]
+     },
+     "execution_count": 11,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "df=data1.copy()\n",
+    "df.isna().sum()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 13,
+   "id": "9cab418a-72a3-4e72-9224-cbae0f196982",
+   "metadata": {
+    "include-cell-in-app": true
+   },
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "prompt\n",
+       "Acne                  328\n",
+       "Shoulder pain         320\n",
+       "Joint pain            318\n",
+       "Infected wound        306\n",
+       "Knee pain             305\n",
+       "Cough                 293\n",
+       "Feeling dizzy         283\n",
+       "Muscle pain           282\n",
+       "Heart hurts           273\n",
+       "Ear ache              270\n",
+       "Hair falling out      264\n",
+       "Head ache             263\n",
+       "Feeling cold          263\n",
+       "Skin issue            262\n",
+       "Stomach ache          261\n",
+       "Back pain             259\n",
+       "Neck pain             251\n",
+       "Internal pain         248\n",
+       "Blurry vision         246\n",
+       "Body feels weak       241\n",
+       "Hard to breath        233\n",
+       "Emotional pain        231\n",
+       "Injury from sports    230\n",
+       "Foot ache             223\n",
+       "Open wound            208\n",
+       "Name: count, dtype: int64"
+      ]
+     },
+     "execution_count": 13,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "df['prompt'].value_counts()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 15,
+   "id": "1f3ee19e-37a4-4eeb-84da-7f1d7daa4c69",
+   "metadata": {
+    "include-cell-in-app": true
+   },
+   "outputs": [
+    {
+     "data": {
+      "image/png": "iVBORw0KGgoAAAANSUhEUgAAA90AAAMWCAYAAADs4eXxAAAAOnRFWHRTb2Z0d2FyZQBNYXRwbG90bGliIHZlcnNpb24zLjEwLjYsIGh0dHBzOi8vbWF0cGxvdGxpYi5vcmcvq6yFwwAAAAlwSFlzAAAPYQAAD2EBqD+naQAAr2RJREFUeJzs3QmcjfX////XWAdj38mS7LKGkshWZClLaZG9IgmJ0GartNhTUgpRKhVJpZBdsmQrO4k+KSVL9m3+t+f7/z3nd86YGTPDZWbOPO6323XjnOs61/U+J7dbt+f1er3fV1hkZGSkAQAAAACAKy7VlT8lAAAAAAAQQjcAAAAAAB4hdAMAAAAA4BFCNwAAAAAAHiF0AwAAAADgEUI3AAAAAAAeIXQDAAAAAOARQjcAAAAAAB4hdAMAAAAA4BFCNwAAAAAAHiF0AwBwFUyePNnCwsLctmzZsov2R0ZGWqFChdz+pk2bejKGP/74wwYNGmTr16+P1+d27dplXbp0sWLFill4eLhlyZLFatasaWPGjLGTJ096MtZQ+2+uTb9dyZIlrXv37vbXX39ZcpTQf0MAkJKlSewBAACQkih4ffjhh3bLLbcEvb948WL7/fffLX369J4GpsGDB1vRokWtUqVKcfrMV199Zffcc48bV7t27ez666+3M2fOuBsHffv2tV9++cXefvttz8YcCoYMGWLXXnutnTp1yv1u48ePt6+//tp+/vlny5gxoyUnCfk3BAApHaEbAICrqHHjxjZjxgwbO3aspUnz//43rCB+ww032D///GNJxa+//mr33XefFSlSxL7//nvLnz+/f99jjz1mO3fudKEcsbvjjjusatWq7u8PPfSQ5cyZ00aOHGlffPGF3X///dF+5vjx45YpU6arPFIAgBdoLwcA4CpSyDp48KDNmzfP/54qx59++qk98MADMQawJ5980rWfq+JcqlQpGz58uGtJD6RzqoKeLVs2i4iIcMc9/fTTbt+iRYusWrVq7u8dO3b0tzyrBTomr776qh07dszefffdoMDtU7x4cevZs6f/9blz52zo0KF23XXXuXGqGqrrnz59Ouhzel8t9BqTwmiGDBmsfPny7rV8/vnn7rW6AnQjYt26dUGf79Chg/t+e/fudefR3wsWLGhvvPGG279p0yarV6+eC626YaAbGlHt3r3bVfBz5Mjhqs03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n3+2O+64wyIiIixv3rzWtm1bN1afOnXqWPfu3a1Xr16WK1cuV8WPTocOHax58+Y2ePBgy507t2XJksW6du3qQrrP3Llz7ZZbbrFs2bJZzpw5rWnTprZr164Y28sXLVrkXusmhsav3+7mm2+2bdu2xfidAQAAACAlSBGhW0FVm+ZRnz59OtZjFUZbt25tGzdutMaNG1ubNm3s33//dfv+97//ufeqVatmGzZssPHjx9u7775rL7zwQoLHduzYMRdqy5Yta2vXrnXhvE+fPhfdNKhXr54L5mvWrHGhWJV6jTOQqviqbqtl/q233orxmgrHW7ZscWF5+vTp9vnnn7vv7XP8+HHr3bu3u5aOTZUqlbsRceHChVi/yzPPPGMjRoxwn0uTJo116tQpwb8LAAAAAISCFNFergA4efJke/jhh10YrVKlit1666123333WYUKFS6qBN9///3u7y+99JKNHTvWVaIbNWpkb775ppvPPG7cOFfZLV26tP3xxx/Wr18/e/755104ja8PP/zQhVmFd1W6y5UrZ7///rubf+6j6ylwazw+7733nhvL9u3brWTJku49VeZfffXVS15TwVyfV0Va1xsyZIj17dvXhg4d6r6DWvED6VhVxTdv3hzrPO4XX3zR/a6iDoAmTZrYqVOn3PeKSjc/Am+AHD169JLjBgAAAIDkJkVUukVBUgFZ7eIK0KryKnwrjAcKDOGZMmVy7dcHDhxwr1UdrlGjhgvcPjVr1nTVagXlhNA5dc3AYKprBFJVfeHChf6KvTYFfgls+77hhhvidM2KFSu6wB14PX2Hffv2udc7duxwNx40913fXy3zsnfv3ljPG/jbqfVefL9dVMOGDbOsWbP6N91AAAAAAIBQk2JCtyjY3nbbbfbcc8/ZihUrXFV74MCBQcekTZs26LUC9qXaqgOpUhwZGRn03tmzZy9r3ArEzZo1c3OoAzeF49q1awfdJLgSdC211L/zzjv2448/uk0C531HJ/C3892YiOm303z6I0eO+Ddf4AcAAACAUJIi2stjonnU8Xkud5kyZeyzzz5zodoXKjV/OnPmzHbNNde412rD1uO0Atumf/3111jPOXXq1KA27JUrVwYdo4q8rquKs1rlL5cq5ydPnrQMGTL4r6fquarNWs1dC6ApcNeqVcvtX7ZsmV1pWohOGwAAAACEshRR6VaQ1EJk06ZNcwukKQTPmDHDzX++66674nyebt26uYrs448/blu3brUvvvjCVcq16JhvPreuoxCt1dI3bdpk7du3d4/YiskDDzzgArzmm2vO9Ndff23Dhw8POuaxxx5zlWe1fK9evdq1lH/77bfWsWNHO3/+fLx/D1WsO3fu7L+evoNWPtd3yJ49u1ux/O2337adO3fa999/774fAAAAACD+UkSlW1XcG2+80UaNGuUCq9q9VdVV0H366afjfJ6CBQu6kKpFxzQvOkeOHC68Pvvss0Ft0wr1WpFcc5W1OFlslW6N7csvv3SP7dJiaaq+69FmgYuZFShQwFXUtWDb7bff7hYg02PPNDc9IYu31a9f3y26ptZ0nUth3vdIM53vo48+sh49erhF00qVKuUWk9MjyQAAAAAA8RMWGXUCMkKa5rHrEWTxaau/GtSGr5sUA5fstvCIzIk9HAAAAACXoX/lXBbqjv5fhtEaVVqAOkW3lwMAAAAAkBhSRHs5ko/eFXPGepcIAAAAAJITQncKE/W55AAAAAAA79BeDgAAAACARwjdAAAAAAB4hNANAAAAAIBHCN0AAAAAAHiE0A0AAAAAgEcI3QAAAAAAeITQDQAAAACARwjdAAAAAAB4hNANAAAAAIBHCN0AAAAAAHiE0A0AAAAAgEcI3QAAAAAAeCSNVycGEmLkhoMWHnEmsYcBAAAAII76V86V2ENI0qh0JzGLFi2ysLAwO3z4sCVFSX18AAAAAJCUELqvgg4dOljz5s3jdOzNN99s+/fvt6xZs3py/suVkPEBAAAAQEpFe3kSky5dOsuXL58lVUl9fAAAAACQlFDpvspOnz5tPXr0sDx58lh4eLjdcssttnr16hjbtydPnmzZsmWzb7/91sqUKWMRERHWqFEjV22WQYMG2ZQpU+yLL75wn9Omc0SnTp061r17d7epUp0rVy577rnnLDIy0n/M1KlTrWrVqpY5c2YXrh944AE7cOBAgscHAAAAACkZofsqe+qpp+yzzz5zQfmnn36y4sWLW8OGDe3ff/+N8TMnTpyw4cOHu0C8ZMkS27t3r/Xp08ft05+tW7f2B11tagGPia6bJk0aW7VqlY0ZM8ZGjhxpEydO9O8/e/asDR061DZs2GCzZs2yPXv2uPb12MQ2PgAAAABIyWgvv4qOHz9u48ePd9XhO+64w733zjvv2Lx58+zdd9+1vn37Rvs5BeG33nrLrrvuOvdaleohQ4a4v6uynCFDBldBj0vbd6FChWzUqFGuWl2qVCnbtGmTe/3www+7/Z06dfIfW6xYMRs7dqxVq1bNjh075q4V3/HFROPV5nP06NFLjh0AAAAAkhsq3VfRrl27XECtWbOm/720adNa9erVbcuWLTF+LmPGjP5AK/nz5w9q+Y6Pm266yQVunxo1atiOHTvs/Pnz7vXatWutWbNmVrhwYddifuutt7r3Vb2+kuMbNmyYa3H3bboZAAAAAAChhtCdDCiYB1JoDpyHfSUr8Wp1z5Ili33wwQdurvnMmTPdvjNnzlzR8Q0YMMCOHDni3/bt23eFvgUAAAAAJB2E7qtI1WCt/r18+XL/e6p8K9yWLVs2wefVOX2V6kv58ccfg16vXLnSSpQoYalTp7atW7fawYMH7eWXX7ZatWpZ6dKlE1xRv5T06dO7cB+4AQAAAECoIXRfRZkyZbJHH33Uzd2eO3eubd682c2l1kJknTt3TvB5ixYtahs3brRt27bZP//844J8TNQm3rt3b3fs9OnT7fXXX7eePXu6fWopV4DXe7t377bZs2e7RdUAAAAAAAnDQmpXwYULF9yK4aIqsl63bdvW/vvvP/d4Lj1uK3v27Ak+v4K7HuWlc2nBs4ULF7rHg0WnXbt2dvLkSTePXNVtBe5HHnnE7cudO7db5O3pp592C6hVqVLFrUp+5513JnhsAAAAAJCShUV6MTkYQfQ4Lz0abNy4cYk6DgXxSpUq2ejRoy2p0erlWlBt4JLdFh6RObGHAwAAACCO+lfOZSnR0f/LMFqjKrbpsrSXe+jQoUM2Z84cV4Vu0KBBYg8HAAAAAHCV0V7uIT3zWoukPfnkk3bXXXcl9nCShd4Vc7KoGgAAAICQQXs5klVrBgAAAAAkBbSXAwAAAACQyAjdAAAAAAB4hNANAAAAAIBHCN0AAAAAAHiE0A0AAAAAgEcI3QAAAAAAeITQDQAAAACARwjdAAAAAAB4hNANAAAAAIBHCN0AAAAAAHiE0A0AAAAAgEcI3QAAAAAAeCSNVycGEmLkhoMWHnEmsYcBAAAAJFv9K+dK7CEgJVe6//zzT7vtttssU6ZMli1bNktqihYtaqNHj7bkbtGiRRYWFmaHDx9O7KEAAAAAQKJJ1qG7Q4cO1rx583h9ZtSoUbZ//35bv369bd++/YqMI1SCMgAAAADgykpx7eW7du2yG264wUqUKJHYQwEAAAAAhLhkXemOqk6dOtajRw976qmnLEeOHJYvXz4bNGhQUEX6s88+s/fff9+1PqtSLmqBfuihhyx37tyWJUsWq1evnm3YsCHo3F9++aVVq1bNwsPDLVeuXNaiRQv/NX/77Td74okn3Dm1+Sxbtsxq1aplGTJksEKFCrmxHT9+3L//wIED1qxZM7f/2muvtQ8++CDW7/fzzz9bqlSp7O+//3av//33X/f6vvvu8x/zwgsv2C233OJ/vXjxYqtevbqlT5/e8ufPb/3797dz587FWqWvVKlS0O+m7zRx4kT3nTNmzOhuWMyePTvoM19//bWVLFnSfZe6devanj17Yv0uAAAAAJAShFTolilTprj52j/++KO9+uqrNmTIEJs3b57bt3r1amvUqJG1bt3atZiPGTPGvX/PPfe4APzNN9/Y2rVrrUqVKla/fn0XauWrr75ygbNx48a2bt06W7BggQuy8vnnn9s111zjrqNzavNV1HWtVq1a2caNG+3jjz92Ibx79+7+sSr079u3zxYuXGiffvqpvfnmm24cMSlXrpzlzJnTBWlZunRp0GvR33UjQP73v/+5MetmgW4ijB8/3t59910XzONr8ODB7nfTd9E527Rp4/999B1atmzpbiCobV83MBTuAQAAACClC7nQXaFCBRs4cKCrxrZr186qVq3qQrKokq2Kr6qxqoJnzZrVBeFVq1bZjBkz3LH63PDhw90iawrC8uKLL7pqsoJnmTJlrGLFijZgwAC3TxX11KlTW+bMmd05tcmwYcNcMO3Vq5c7580332xjx451VfZTp065+eQK+e+8847ddNNNruVdgfjkyZMxfjdVnGvXru0WKRP92bFjRzt9+rRt3brVzp49aytWrLBbb73V7VeIV4V93LhxVrp0aTf/Xd9hxIgRduHChXj9rrpBcP/991vx4sXtpZdesmPHjrnfTRTmr7vuOnfeUqVKue/t6yKIicZ89OjRoA0AAAAAQk1Ihu5AaqmOrXqsCrACpCrGERER/u3XX3911WpR9VaV7/jQeSdPnhx0zoYNG7qwq3Nv2bLF0qRJ48K2j4LxpVZUV6D2hW5VtdUK7wviquQreNesWdPt1zVq1KgR1PKuffq+v//+e4J/V3USqA3f97vqOjfeeGPQ8bpu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y5gxo5UoUcJdN9DPP/9sd9xxh0VERFjevHmtbdu27jMAAAAAkJIRupMoVazHjh1rv/zyi02ZMsW+//57e+qpp4KOOXHihL3yyis2ceJEd1yePHkuOs+FCxfsmmuusRkzZtjmzZvt+eeft6effto++eQT/zHjx4+3xx57zB555BHbtGmTC9TFixcPOs/gwYOtdevWtnHjRmvcuLG1adPG/v33X7fv8OHDVq9ePatcubKtWbPG5s6da3/99Zc7PianT5+2o0ePBm0AAAAAEGrCIiMjIxN7EClxTve0adMsPDw86H2FYW3R+fTTT61r167+6rEq3R07drT169dbxYoV43V9VbH//PNPd04pWLCgO9cLL7wQ7fFqW3/22Wdt6NCh7vXx48ddRfubb75xbfL63NKlS+3bb7/1f+b33393Ffpt27ZZyZIlLzrnoEGDXJCPauCS3RYekTle3wcAAADJE48MQ3KmwmHWrFntyJEjliVLlhiPY053Iqlbt66rMAfKkSOH/+/z58+3YcOG2datW91/zHPnztmpU6dcdVst3pIuXTqrUKHCJa/1xhtvuPZxtZ+fPHnSzpw5Y5UqVXL7Dhw4YH/88YfVr18/1nMEXkct7/pHpc/Khg0bbOHChS6IR7Vr165oQ/eAAQOsd+/e/tf6jgrpAAAAABBKCN2JRME1agu3z549e6xp06b26KOP2osvvujC+LJly9zcbAVmX+jWHG1VoWPz0UcfWZ8+fWzEiBFWo0YNy5w5s7322mv2448/+s8RF2nTpg16reuqdV0017xZs2au1T0qzQ+PjuaOX87CcQAAAACQHBC6k6C1a9e6QKug7FuNPHAOdnwsX77cbr75ZrcQW2D12UchvGjRorZgwQJXfU+IKlWq2GeffebOkyYN/6QAAAAAwIeF1BKJFhLTvOrAzTdfWxXws2fP2uuvv267d++2qVOn2ltvvZWg62ilcS1upvnW27dvt+eee85Wr1590fxqBXwt3LZjxw776aef3LXjSouwaVG1+++/351boV7X0zxxrZ4OAAAAACkVoTuRaIVvtV4Hbrfccovbp4XR9MgwtWtff/319sEHH7j53QnRpUsXa9mypd17771244032sGDB4Oq3tK+fXsbPXq0vfnmm+6xYWptV/iOqwIFCriKugL27bff7h511qtXL/dIM54bDgAAACAlY/Vy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GitatGiCzgEAAAAAoYj28qukX79+tmLFCrdwmtq5d+zY4eZn+xZSU7U7Xbp09vrrr9vu3btduNaiaoE0D1uf69u3r23bts0+/PBD17IeG4V8LdDmO69WSH/rrbcuavVevXq1W9Vci7xt3brVxo8f75/zfSkNGjRwbe56Xvl3333nquv6rs8888xFNw4AAAAAICUhdF8lqiYvXrzYtm/f7h4bVrlyZXv++eetQIECbr/ayRWgZ8yY4VYRV8V7+PDhQedQMP/ss8/cyuYVK1Z04fmll16K9bo6To8M02Jr119/vWtdHzZsWNAxegSZwrLmZmuBNAVo3RBQ5Tou1GquR5nVrl3bOnbs6M5333332W+//WZ58+aN928FAAAAAKGC1cuRpFb+Y/VyAACA5IPVy5GSHY3j6uUJmtPdqVMnGzNmjFsJO5AWA3v88cftvffeS8hpAetdMWes/2ABAAAAIOTby6dMmWInT5686H299/7771+JcQEAAAAAkOyliW/5XN3o2v777z8LDw/37zt//ryb15snTx4vxgkAAAAAQGiHbj1zWYtmadNiWVHp/YQ+dgoAAAAAgBQduhcuXOiq3PXq1XOraOfIkcO/T4+7KlKkiH81bgAAAAAAUrp4he5bb73V/fnrr79aoUKFLFUqnjgGAAAAAMAVXb1cFe1Dhw7Zu+++a1u2bHHv6dnSekZzYPUbAAAAAICULEGl6iVLlljRokVt7NixLnxr09+vvfZatw8AAAAAAJiFRWqSdjyVL1/eatSoYePHj7fUqVP7Vy/v1q2brVixwjZt2uTFWBHC4vpgeQAAAABIThkmQZXunTt32pNPPukP3KK/9+7d2+0DAAAAAAAJDN1VqlTxz+UOpPcqVqx4JcYFAAAAAEDKXEitR48e1rNnT1fVvummm9x7K1eutDfeeMNefvll27hxo//YChUqXLnRAgAAAAAQ6nO6L/WosLCwMPc8b/2pud7ApTCnGwAAAEAoZpgEVbr1nG4AAAAAAODRc7oBL4zccNDCI84k9jAAAAAQB/0r50rsIQChGbrljz/+sGXLltmBAwfswoULF835BgAAAAAgpUtQ6J48ebJ16dLF0qVLZzlz5nRzt330d0J33AwaNMhmzZpl69evd687dOhghw8fdu8lZXEZZ506daxSpUo2evToqzo2AAAAAEj2ofu5556z559/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KVPGfvjhB9u5c6fVqVPHMmXKZDfffLPt2rXL/xn9/a677rK8efNaRESEVatWzebPnx903tOnT1u/fv2sUKFCrjpfvHhxe/fdd4OOWbt2rVWtWtVdV9fYtm1brL+FzleyZEl3vG4+PPfcc3b27NmgY7788ks3nvDwcMuVK5f7TQKdOHHCOnXqZJkzZ3adA2+//XbQ/n379lnr1q0tW7ZsliNHDvc99+zZE+u4AAAAACDUhWzoVqjVptZxBdnorF692v05adIk279/v//1zJkzrWfPnvbkk0/azz//bF26dLGOHTvawoULgz4/dOhQa9euna1fv95Kly5tDzzwgDtWwX7NmjUWGRlp3bt39x9/7Ngxa9y4sau2r1u3zho1amTNmjWzvXv3+o/R+aZPn25jx461LVu2uGCv7xHomWeesREjRrhrpEmTxoXh2CgoT5482TZv3mxjxoyxd955x0aNGuXf/9VXX7mQrbFpXBqfblAE0vUU9LW/W7durm3fF/YV4NW2r+voRofa9zVmfT91GgAAAABAShUWqWQYoj777DN7+OGH7eTJk1alShW79dZb7b777rMKFSoEVawVsps3b+5/r2bNmlauXLmgaq6quMePH3cB1fe5Z5991gVvWblypdWoUcNVpX0h+KOPPnJhXdePyfXXX29du3Z14Xz79u2uqj5v3jxr0KBBtAupqWqv6nj9+vXde19//bU1adLEXUNV6rgYPny4G5tCu6hargr4tGnToj1eHQC1atXyV/v1T0bz4wcPHuzGrs+98MIL7iaBfhdR2FbVWzc9br/99ovOqRshgTdDjh496qr7A5fstvCIzHH6HgAAALh6WL0cCKYMkzVrVjty5IhlyZLFUlyl2zen+48//rDZs2e7qqtCq8K3qr6xUXhU8A6k13o/UGB4V8u4lC9fPui9U6dOuf8Yvkp3nz59XCu6AqmqwTqnr9Ktinnq1KndzYHYBF43f/787s8DBw7EePzHH3/sxq+grGvqZkFgdV3X9YX4uFxTwVrn8l1zw4YNrq1elW5fh4FazPXdA9vrAw0bNsz9A/VtCtwAAAAAEGpCOnSLqr+33Xabm8e8YsUK69Chgw0cOPCKnDtt2rT+v/sqvNG9d+HCBfenAreq6i+99JJrw1bYVUj3tWBnyJAhwdf1XSMqzTNv06aNax2fM2eOaw9Xe3pg23dcrht4Td91fdfUzYQbbrjBfZ/ATZV7tdxHRy34uiPk2zQnHAAAAABCTciH7qjKli3r2sQDw+T58+eDjlElOvCxYqLX+uzl0DkU+jV/WmFb1eLAxcb0noLs4sWL7UrRjQYtIqegrTnZJUqUsN9+++2iKrbmcSeUugd27NhhefLkcQu/BW6qYkdHi8SpBSNwAwAAAIBQE7KhW48Fq1evnptvvHHjRvv1119txowZ9uqrr7qVtQPnKytw/vnnn3bo0CH3Xt++fV0LulYwV5gcOXKkff75565SfTkUeHUeVYHVkq0qcGCFWmNp3769mxOuudAas1riP/nkk8u6plrJNYdbrd5aoE3V9kCq/GvxNv2pdvdNmza5Vd/jSpV0rXiu31UVfN+4e/ToYb///nuCxw4AAAAAyV3Ihm7NK77xxhvdKt21a9d2C5apxVwLq40bNy5oVW4tXKY5xZUrV3bvaVE1rfKtBce0oJpWENcK53oU2OVQeM+ePbtbuEyrlmvFb1WJAyno33333W6FcK2IrvEGVubjS49He+KJJ9xCbZUqVXKVb/0OgfS9dENCc991jG5WrFq1Ks7X0KPIlixZ4h4l1rJlS9cp0LlzZzenmwo2AAAAgJQspFcvR/Jb+Y/VywEAAJImVi8HgrF6OQAAAAAAiSxNYg8ACNS7Yk5a0gEAAACEDCrdAAAAAAB4hNANAAAAAIBHCN0AAAAAAHiE0A0AAAAAgEcI3QAAAAAAeITQDQAAAACARwjdAAAAAAB4hNANAAAAAIBHCN0AAAAAAHiE0A0AAAAAgEcI3QAAAAAAeITQDQAAAACARwjdAAAAAAB4JI1XJwYSYuSGgxYecSaxhwEAAJCi9a+cK7GHAIQMKt0AAAAAAHiE0J3MFS1a1EaPHp1irgsAAAAAyQmh2yMdOnSwsLAw/5YzZ05r1KiRbdy40ULB6tWr7ZFHHknsYQAAAABAkkbo9pBC9v79+922YMECS5MmjTVt2tRCQe7cuS1jxoyJPQwAAAAASNII3R5Knz695cuXz22VKlWy/v372759++zvv//2H9OvXz8rWbKkC7DFihWz5557zs6ePRt0ni+//NKqVatm4eHhlitXLmvRokWM15w4caJly5bNhfzoTJ482e2fNWuWlShRwp2zYcOGblw+u3btsrvuusvy5s1rERER7trz58+Ptb1c1XxdW2PTd9G5Z8+enaDfDQAAAABCBaH7Kjl27JhNmzbNihcv7lrNfTJnzuyC8ObNm23MmDH2zjvv2KhRo/z7v/rqKxdkGzdubOvWrXNhunr16tFe49VXX3XB/rvvvrP69evHOJYTJ07Yiy++aO+//74tX77cDh8+bPfdd1/QWHU9XUvXVMW+WbNmtnfv3li/4+DBg61169auhV6fb9Omjf3777/RHnv69Gk7evRo0AYAAAAAoSYsMjIyMrEHEapzuhWyVUmW48ePW/78+W3OnDlWpUqVGD83fPhw++ijj2zNmjXu9c033+wq4DpXdFRx7tWrl2thnzp1qs2bN8/KlSsX4/kV8Dt27GgrV660G2+80b23detWK1OmjP34448xBvrrr7/eunbtat27dw+6rjZfpfvZZ5+1oUOH+r+vquTffPONC+1RDRo0yIX0qAYu2W3hEZljHD8AAAC8xyPDgEtT4TBr1qx25MgRy5IlS4zHUen2UN26dW39+vVuW7VqlWvjvuOOO+y3337zH/Pxxx9bzZo1XQu6QqqCa2BFWZ+NrWotI0aMcBXyZcuWxRq4fTS3XC3jPqVLl3Yt51u2bPFXuvv06eOCuN7XuLTvUpXuChUq+P+eKVMm9w/vwIED0R47YMAA94/TtwW2twMAAABAqCB0e0jBU+3k2hRyNedZFWAFZPnhhx9cC7ZasVUBVyv3M888Y2fOnPGfI0OGDJe8Tq1atez8+fP2ySefXJFxK3DPnDnTXnrpJVu6dKkL/uXLlw8aV3TSpk0b9FrV7wsXLsQ4312hPHADAAAAgFCTJrEHkJIohKZKlcpOnjzpXq9YscKKFCnigrZPYBXcVz3W3Gq1hMdELeFq+1Ybt6rYCs2xOXfunGtf97WSb9u2zc3rVmVbNM9b7fG+BdtU+d6zZ89lfHMAAAAASJkI3R7SYmF//vmn+/uhQ4ds3LhxLsBqUTLRCt9q2dYcblXCtWiaKsyBBg4c6NrLr7vuOrfYmQLz119/7VY9D6S533pf7esK3r651jFVpB9//HEbO3asO1aB/aabbvKHcI3r888/d+PUjQKtqB5TxRoAAAAAEDPayz00d+5ct3iaNi1atnr1apsxY4bVqVPH7b/zzjvtiSeecKFXjxRT5VsBN5CO1Wf0+C0dU69ePTc/PDq33HKLC+6aF/7666/HOC490kuh/YEHHnDzyTVnW3PLfUaOHGnZs2d3QV7BW3PRY1v8DQAAAAAQPVYvT2G0ermq4GonT4or/7F6OQAAQOJj9XLgyq1eTns5kpTeFXOyqBoAAACAkEF7OQAAAAAAHiF0pzBalTyptZYDAAAAQKgidAMAAAAA4BFCNwAAAAAAHiF0AwAAAADgEUI3AAAAAAAeIXQDAAAAAOARQjcAAAAAAB4hdAMAAAAA4BFCNwAAAAAAHiF0AwAAAADgEUI3AAAAAAAeIXQDAAAAAOCRNF6dGEiIkRsOWnjEmcQeBgAAQLLTv3KuxB4CgGhQ6QYAAAAAwCOE7mRs0aJFFhYWZocPH04R1wUAAACA5IbQ7YEOHTq4UPryyy8HvT9r1iz3fnJ388032/79+y1r1qyJPRQAAAAASNII3R4JDw+3V155xQ4dOmShJl26dJYvX76QuIEAAAAAAF4idHukQYMGLpgOGzYs1uOWLVtmtWrVsgwZMlihQoWsR48edvz4cf/+06dPW79+/dy+9OnTW/Hixe3dd9+N9lwnTpywO+64w2rWrBlj63edOnWse/fublOlOleuXPbcc89ZZGSk/5ipU6da1apVLXPmzO47PPDAA3bgwIEY28snT55s2bJls2+//dbKlCljERER1qhRI1cNBwAAAICUjNDtkdSpU9tLL71kr7/+uv3+++/RHrNr1y4XTlu1amUbN260jz/+2IVwBWKfdu3a2fTp023s2LG2ZcsWmzBhggu1USkA33bbbXbhwgWbN2+eC8ExmTJliqVJk8ZWrVplY8aMsZEjR9rEiRP9+8+ePWtDhw61DRs2uJb4PXv2uJb52CjwDx8+3AX2JUuW2N69e61Pnz4xHq+bCUePHg3aAAAAACDU8MgwD7Vo0cIqVapkAwcOjLY6rSp4mzZtrFevXu51iRIlXLi+9dZbbfz48S64fvLJJy5Eq3IuxYoVu+g8f/75p917773u8x9++KFr/46NquajRo1y1epSpUrZpk2b3OuHH37Y7e/UqZP/WF1PY6pWrZodO3Ys2sDvC+pvvfWWXXfdde61bhwMGTIkxjHouw8ePDjWcQIAAABAckel22Oa163KsqrUUamSrNZsBVnf1rBhQ1et/vXXX239+vWuYq4QHhtVuNV2rkr5pQK33HTTTUHzsWvUqGE7duyw8+fPu9dr1661Zs2aWeHChV2Lue/6ugkQk4wZM/oDt+TPnz+oJT2qAQMG2JEjR/zbvn37LjluAAAAAEhuCN0eq127tgvSCplRqXLcpUsXF659m4K4ArACrOZ5x0WTJk1cS/fmzZsve7yaT67xZsmSxT744ANbvXq1zZw50+07c+ZMjJ9LmzZt0GuF+sB54lFpfrquEbgBAAAAQKihvfwq0KPD1GauVu5AVapUcUFZVerolC9f3lW9Fy9e7G8vj+n8qpLXr1/fLXJWtmzZWMfz448/Br1euXKla01XVX3r1q128OBBd061ocuaNWvi8W0BAAAAAD5Uuq8ChWfN3dbc6EBalXzFihVu/rOq3Kpwf/HFF/6F1IoWLWrt27d3c6y1oJlazhWqNc87Ki1ipmvUq1fPBefYqE28d+/etm3bNrdImxZ769mzp9unlnK1qOu93bt32+zZs92iagAAAACA+CN0XyVaVExV60AVKlRwVezt27e7x4ZVrlzZnn/+eStQoID/GC2odvfdd1u3bt2sdOnSbrGzwEeKBdJiaK1bt3bBW+eMiVZEP3nypFWvXt0ee+wxF7gfeeQRty937txunvmMGTNcxVwVbwV6AAAAAED8hUXGNvEWIUfP6Var++jRoy0p0SPD9NzwgUt2W3hE5sQeDgAAQLLTv3KuxB4CkKIc/b8Mo4WhY1ujijndSFJ6V8zJomoAAAAAQgbt5QAAAAAAeIRKdwqjhdgAAAAAAFcHlW4AAAAAADxC6AYAAAAAwCOEbgAAAAAAPELoBgAAAADAI4RuAAAAAAA8QugGAAAAAMAjhG4AAAAAADxC6AYAAAAAwCOEbgAAAAAAPELoBgAAAADAI4RuAAAAAAA8ksarEwMJMXLDQQuPOJPYwwAAAEiS+lfOldhDABBPVLoBAAAAAPAIoTuE7Nmzx8LCwmz9+vWeXmfy5MmWLVs2T68BAAAAAKGA0P1/OnToYM2bN4/XZxRwZ82aZSnNvffea9u3b0/sYQAAAABAksec7iTg7NmzljZtWksuMmTI4DYAAAAAQOyodMegTp061qNHD3vqqacsR44cli9fPhs0aJB/f9GiRd2fLVq0cBVv32v54osvrEqVKhYeHm7FihWzwYMH27lz5/z7dfz48ePtzjvvtEyZMtmLL77ozl2pUiWbOnWqO1fWrFntvvvus//++8//ublz59ott9ziWrtz5sxpTZs2tV27dsXre+ncQ4cOtfvvv99du2DBgvbGG28EHTNy5EgrX76821+oUCHr1q2bHTt2LMb28riMHQAAAABSIkJ3LKZMmeKC548//mivvvqqDRkyxObNm+f2rV692v05adIk279/v//10qVLrV27dtazZ0/bvHmzTZgwwYVUBetACqoK7Js2bbJOnTq59xSg1a4+Z84cty1evNhefvll/2eOHz9uvXv3tjVr1tiCBQssVapU7hwXLlyI1/d67bXXrGLFirZu3Trr37+/G6vve4nOO3bsWPvll1/cb/D999+7mw+xudTYozp9+rQdPXo0aAMAAACAUEN7eSwqVKhgAwcOdH8vUaKEjRs3zoXd2267zXLnzu3eV8VXVXAfVbUVZNu3b+9eq9KtyrJCq+9c8sADD1jHjh2DrqfwrICeOXNm97pt27buer7A3qpVq6Dj33vvPTcOhfvrr78+zt+rZs2aboxSsmRJW758uY0aNcp9L+nVq5f/WFWuX3jhBevatau9+eabMZ7zUmOPatiwYe63AgAAAIBQRqX7EqE7UP78+e3AgQOxfmbDhg2uIh4REeHfHn74YVcNP3HihP+4qlWrXvRZBVxfaI3uejt27HBt4QryWbJk8be07927N17fq0aNGhe93rJli//1/PnzrX79+q71XONRgD548GDQ+OM79qgGDBhgR44c8W/79u2L13cAAAAAgOSASncsoi5uprnYl2rl1txnVXBbtmx50T7N8fZR23p8r9esWTMrUqSIvfPOO1agQAG3TxXuM2fO2JV87Jjmij/66KOuSq357MuWLbPOnTu762TMmPGK/Fbp06d3GwAAAACEMkL3ZVDQPH/+fNB7WkBt27ZtVrx48St6LVWadV4F7lq1arn3FIYTYuXKlRe9LlOmjPv72rVrXVgeMWKEm9stn3zyyWWPHwAAAABSIkL3ZVBLteYta460qrbZs2e3559/3lWKCxcubHfffbcLrmo5//nnn93c6ITSubVi+dtvv+1at9VS7puXHV+aw62F4fRcci2gNmPGDPvqq6/cPt0s0CPMXn/9dVdZ17FvvfVWgscNAAAAACkZc7ovg6rBCq16rFblypXdew0bNnSrd3/33XdWrVo1u+mmm9wiZWoLvxwK7x999JGrRKul/IknnnCrkCfEk08+6VZA15h1I0CPCNO4Raua6/Urr7zirvPBBx+4Rc8AAAAAAPEXFhkZ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VatWuUqy2pd/++03t1/V34oVK/oDt6i1WeFXC5wpaKoSfeONN/r3Kyz7QqzPww8/bN99953973//c69VGfct5BZXqgYr1KrSrUCqTS3muimgqrJuGujPzp07+/dre+GFF9z70Xn00Ufto48+cmFabfErVqyIdQwKzArbap9XtV3hXq3sqmCryl2gQAEXjH3j1fcMHIt+X/12v/76qztGLfS6gaEbEPpevsCumwGBVOFWB4Kq5TEFbl/Q180B36aWdgAAAAAINcmm0q0wrTDnoyqywto777zjwuqVomqywrsq5qpI//LLL669PD5U/b3hhhtcC3lUmpPtm2eusQfeBJDUqVNHe07fDYavv/7atWzXr1/fHnvsMRs+fHi0x6syrzZ6Beq0adO6OeN6T0Fc88N9odk33i5durh53FEpZPta97XpO+k7KGzrta9d3qdJkyb22Wefuap9+fLlY/yN1HGg+fWBlW6CNwAAAIBQk2xCd1SqPKu1/OTJk+61qriq1iog+qrdmkutY0qVKuUCulrSf/zxR6tdu7bbf+7cOVfBrVKlStC5tciYWtFV7W7QoEG8w6DOp0pvnjx5LEuWLBft11hUad69e7dr644rhV21nmvTvO2+ffvGGLp987pHjRrlD9gK3S+//LIL3ZqDHjheheTAmxqBtEDdwYMH3Wd9v8WaNWuiPVbHqFKumwIK+GXLlo1xYTxtAAAAABDKkk17ueb/ar6wNrWSP/74465Cq5ZnUXjV3GMF0p9//tkWLlzojtGq45rPLT179nShUAuBbd261bp16xbtytqa1/3777+7SnRMC6jFRmPRwmVasVyt3WrRVgBVJVnnFc2vVou15kZv377dBVvN+x45cmS059Sia1988YVrW1f1XfPZdaMhJlpQrkKFCq4y7ZuPrpsNP/30k7teYKW7X79+rl1dC6epfX/Hjh3uWr6F1FTtVqv466+/7m4UaKE5LaoWE90I0G+gleT1OwMAAABASpVsQvfcuXNdpVqbWrJ9K5T7AmXGjBndomhakVwLfN19992u2qrF1HxU3VUIVzCvUaOGm5vcokWLaCvRWslbFVs9Liy+NJYlS5a4sOqbS63525rT7at8q5quFnkFbbVhKwSrUq8F1aKj0KuWbAVphWe1oWuOd2x0Tq3G7vuNNK9clWct+Kbqv4/OqXneCuOqkKvFXiFf1XhfhV1j0++tz+vGRUwVdh9V2PXINAVvnRcAAAAAUqKwyMAHVcNPgV2PAlMlGt7TnG7d7Bi4ZLeFR2RO7OEAAAB4on/l6B/5CiD5Zhgt2h3dtOJkP6fbK5rvrFZwbW+++WZiDwcAAAAAkIwRuqNQa7WCt57tHdiCjaujd8Wcsd4lAgAAAIDkhNAdxZ49exJ7CAAAAACAEJFsFlIDAAAAACC5IXQDAAAAAOARQjcAAAAAAB4hdAMAAAAA4BFCNwAAAAAAHiF0AwAAAADgEUI3AAAAAAAeIXQDAAAAAOARQjcAAAAAAB4hdAMAAAAA4BFCNwAAAAAAHiF0AwAAAADgkTRenRhIiJEbDlp4xJnEHgYAAIBf/8q5EnsIAJIxKt1XwKJFiywsLMwOHz7s+bU6dOhgzZs3t6QkKY4JAAAAAJKCkAvdMQXAqxmMo6Nrz5o1y5KzPXv2uO+xfv36xB4KAAAAACQLIRe6vXTmTPJse06u4wYAAACA5C7Fhu6DBw/a/fffbwULFrSMGTNa+fLlbfr06UHH1KlTx7p37269evWyXLlyWcOGDd37X3/9tZUsWdIyZMhgdevWdRXg2BQtWtT92aJFC1cp9r2W8ePH23XXXWfp0qWzUqVK2dSpU+M0/sGDB1vu3LktS5Ys1rVr16BgHdO4f/75Z7vjjjssIiLC8ubNa23btrV//vnH/7m5c+faLbfcYtmyZbOcOXNa06ZNbdeuXf791157rfuzcuXK7nvoOoGGDx9u+fPnd5997LHH7OzZs3H6LgAAAAAQqlJs6D516pTdcMMN9tVXX7kw+sgjj7gQumrVqqDjpkyZ4gLx8uXL7a233rJ9+/ZZy5YtrVmzZq7N+qGHHrL+/fvHeq3Vq1e7PydNmmT79+/3v545c6b17NnTnnzySTeGLl26WMeOHW3hwoWxnm/BggW2ZcsW1zKvGwWff/65C+GxjVtt9fXq1XOBec2aNS5g//XXX9a6dWv/Z44fP269e/d2+3WNVKlSuRsFFy5ccPt9v838+fPd99B1fTRmBXT9qWtPnjzZbQAAAACQkoVFRkZGWojN6Z42bZqFh4cHvX/+/HkXtA8dOuQqudFRZbd06dKuYiuq5B49etR++ukn/zFPP/20ffHFF/bLL7/431PofuWVV2I9tyrDCtmB881r1qxp5cqVs7ffftv/nkKwwq9uBsT0/b788ksX/lWhF4Xqvn372pEjR1xQjm7cL7zwgi1dutS+/fZb/3u///67FSpUyLZt2+Yq91GpCq5q+qZNm+z66693FX1Vu9etW2eVKlUKGpNuACh0p06d2v89NJaPPvoo2u9x+vRpt/lovBrLwCW7LTwic7SfAQAASAysXg4gOsowWbNmdTlMHcgpqtKtlm9VoQO3iRMnXhTChw4d6trKc+TI4VquFUj37t0bdJyq4YFUYb7xxhuD3qtRo0aCxqlzKXgH0mu9H5uKFSv6A7fv+seOHXNBPKZxb9iwwVWh9T19m24wiK+FfMeOHa7lvlixYu4fja8NPupvEh3dPPAFblGb+YEDB2I8ftiwYe4fqG9T4AYAAACAUBOSz+nOlCmTFS9ePOg9VXUDvfbaazZmzBgbPXq0C976jOZAR110TO8nR1HHrVCulnhV5KNSQBbtL1KkiL3zzjtWoEAB11auCndcFmJLmzbtRZV9X1t6dAYMGOBa2aNWugEAAAAglIRk6I4LzXW+66677MEHH3SvFRC3b99uZcuWjfVzZcqUsdmzZwe9t3LlyjiFUlXXo55L42jfvn3QuC41BlWtT5486RZy811flevYQmuVKlXss88+c9XrNGnSRLuwnNrMFbhr1arl3lu2bFnQMZojLlG/R0KkT5/ebQAAAAAQykKyvTwuSpQoYfPmzbMVK1a4dm4tYqaFxS5FK4WrDVtzqBVSP/zwwzgtGKawq8XJ/vzzTzf3W3QOfVYrmOucI0eOdIuT9enTJ9ZzqfLcuXNn27x5s1tJfeDAgW61cs2hjolWE//3339d+7gWclNLudrptXCbQnT27NndquOaX75z5077/vvvgyrRkidPHhf0fYuwae4CAAAAACBmKTZ0P/vss676q8dpaeGxfPnyBS1yFpPChQu7ivGsWbPc3GotYvbSSy9d8nMjRoxwIV/VaK0gLrqeWty1cJvmRE+YMMGtcB71UVxR1a9f3900qF27tt17771255132qBBg2L9jNrFVUVXwL799ttdS73a6bXwm8K6b9GztWvXupbyJ554wrXgB1KFfOzYsW6cOp86BQAAAAAAKWj1ciTvlf9YvRwAACQ1rF4OIDopevVyAAAAAACSghS7kBqSpt4Vc8Z6lwgAAAAAkhMq3QAAAAAAeITQDQAAAACARwjdAAAAAAB4hNANAAAAAIBHCN0AAAAAAHiE0A0AAAAAgEcI3QAAAAAAeITQDQAAAACARwjdAAAAAAB4hNANAAAAAIBHCN0AAAAAAHiE0A0AAAAAgEcI3QAAAAAAeCSNVycGEmLkhoMWHnEmsYcBAABSqP6VcyX2EACEGCrdAAAAAAB4hNDtkUGDBlmlSpWu+nXr1KljvXr18vw6YWFhNmvWLM+vAwAAAADJWciE7g4dOrggGHVr1KhRogTQPn362IIFCyxU7d+/3+64447EHgYAAAAAJGkhNadbAXvSpElB76VPnz5RxhIREeG2UJUvX77EHgIAAAAAJHkhU+n2BWyFwcAte/bsQRXpCRMmWNOmTS1jxoxWpkwZ++GHH2znzp2uLTtTpkx28803265du4LOO378eLvuuussXbp0VqpUKZs6dap/X9GiRd2fLVq0cOf3vY7aXn7hwgUbMmSIXXPNNW6c2jd37lz//j179rjPf/7551a3bl03vooVK7rx+Rw8eNDuv/9+K1iwoNtfvnx5mz59erx+I9+49DsUKlTInad169Z25MgR/zGrV6+22267zXLlymVZs2a1W2+91X766acYq/txGTsAAAAApEQhFbrjYujQodauXTtbv369lS5d2h544AHr0qWLDRgwwNasWWORkZHWvXt3//EzZ860nj172pNPPmk///yzO7Zjx462cOFCf0AVVdjVcu17HdWYMWNsxIgRNnz4cNu4caM1bNjQ7rzzTtuxY0fQcc8884xrTdf4SpYs6UL2uXPn3L5Tp07ZDTfcYF999ZUbyyOPPGJt27a1VatWxes30E2GTz75xL788ksX/NetW2fdunXz7//vv/+sffv2tmzZMlu5cqWVKFHCGjdu7N6PTWxjj+r06dN29OjRoA0AAAAAQk1Ihe45c+b427p920svvRR0jAKzKrsKhf369XNV2jZt2rgQrMq3AvaiRYv8xyska764Qqk+07t3b2vZsqV7X3Lnzu3+zJYtm6us+15HpeN1vfvuu89Vy1955RVXcR49enTQcQqtTZo0cdcaPHiw/fbbby4kiyrc2q/PFStWzB5//HHXUq8AHR8K7++//747T+3ate3111+3jz76yP7880+3v169evbggw+6mxL6Td5++207ceKELV68ONbzxjb2qIYNG+aq6L5NVXcAAAAACDUhFbrV2qwqa+DWtWvXoGMqVKjg/3vevHndn2rTDnxPodRXed2yZYvVrFkz6Bx6rffjSuf6448/4nSewPHlz5/f/XngwAH35/nz512lXuPNkSOHu6nw7bff2t69ey0+Chcu7AK8T40aNVz7+7Zt29zrv/76yx5++GFX4VYgzpIlix07duyS14lt7FGps0At7b5t37598foOAAAAAJAchNRCapqTXbx48ViPSZs2rf/vmocc03sKoYkhtrG89tprrk1d1XEFb31fPR7szJkzV3QMai3X/HFdq0iRIm4OuoL5pa4Tn99R50ysRe4AAAAA4GoJqUq3F9RevXz58qD39Lps2bJBYVNV6JioUlygQIFLnudSdPxdd93lWr+1UJlazLdv327xpYq1Ku8+mredKlUq1/buu06PHj3cPO5y5cq5cPzPP//E+zoAAAAAkNKFVKVbi3P55iX7pEmTxq3CnVB9+/Z1c8ArV65sDRo0cIuPaZXu+fPn+4/RiuV6JrfaxRVQA1dMDzzPwIED3SromkuthdfU/v7BBx/EeSxq9/70009txYoV7hojR450reDxCe4SHh7uqtmaZ67WdwVsfUffY8B0Ha3QXrVqVbdfY8+QIUO8rgEAAAAACLFKt1bi1lziwO2WW265rHM2b97ctVkroKrqq0dtKTDrEWM+WpV83rx5bjEwhfPoKNhqETatgq7WcI119uzZLuDG1bPPPmtVqlRxi77p+grJGl98qQVfi8Gpkn377be7udhvvvmmf/+7775rhw4dctfS6ugae548eeJ9HQAAAABI6cIi9YwspBh6Treer60qe1KiiroWbRu4ZLeFR2RO7OEAAIAUqn/lhHdIAkhZjv5fhtHC0JpSnCLay5H89a6YM9Z/sAAAAACQnIRUezkAAAAAAEkJ7eVIVq0ZAAAAAJCcMgyVbgAAAAAAPELoBgAAAADAI4RuAAAAAAA8QugGAAAAAMAjhG4AAAAAADxC6AYAAAAAwCOEbgAAAAAAPELoBgAAAADAI4RuAAAAAAA8QugGAAAAAMAjhG4AAAAAADySxqsTAwkxcsNBC484k9jDAAAAKUz/yrkSewgAQhSVbgAAAAAAPJLsQnfRokVt9OjRiXLtEydOWKtWrSxLliwWFhZmhw8fTpRxAAAAAACSh0RtL+/QoYMLrrNmzYrzZ1avXm2ZMmWyxDBlyhRbunSprVixwnLlymVZs2a1lKpOnTpW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",
+      "text/plain": [
+       "<Figure size 1000x800 with 1 Axes>"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "import matplotlib.pyplot as plt\n",
+    "\n",
+    "top_counts = df['prompt'].value_counts().head(30)\n",
+    "\n",
+    "plt.figure(figsize=(10, 8))\n",
+    "top_counts.sort_values().plot(kind='barh', color='skyblue')\n",
+    "\n",
+    "plt.title('Most Common Prompts')\n",
+    "plt.xlabel('Count')\n",
+    "plt.ylabel('Prompt')\n",
+    "plt.tight_layout()\n",
+    "plt.show()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 17,
+   "id": "cb3d30db-a3d2-46d3-a8a6-b95d12eb98c3",
+   "metadata": {
+    "include-cell-in-app": true
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Total number of intents: 25\n",
+      "Total number of intents: 25\n"
+     ]
+    }
+   ],
+   "source": [
+    "print('Total number of intents: %d' % len(df['prompt'].value_counts().index))\n",
+    "print('Total number of intents: %d' % len(df['prompt'].value_counts().index))\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "93e2e8af-fc8b-46e5-a19e-a9a6c0feb399",
+   "metadata": {
+    "include-cell-in-app": true
+   },
+   "source": [
+    "## 3. Split data to train, validation and test sets for balance\n",
+    "\n",
+    "It's the best to split data to train(70%), validation(10%) and testset (20%) stratified by the variable \"intent\". After stratification, data for each intent will balanced and data for each set will be proportional to 70%, 10% and 20%. That is crucial for training and testing purposes."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 20,
+   "id": "ab95a4f0-0547-42b7-8a74-4f086db51618",
+   "metadata": {
+    "include-cell-in-app": true
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Original rows: 6661\n",
+      "Unique (phrase,intent) pairs: 705\n",
+      "Ambiguous phrases removed: 2\n",
+      "Final unique phrases: 701\n"
+     ]
+    }
+   ],
+   "source": [
+    "from sklearn.model_selection import train_test_split\n",
+    "\n",
+    "# Normalize text for grouping by phrase.\n",
+    "df_clean = df[['phrase', 'prompt']].copy()\n",
+    "df_clean['phrase_norm'] = df_clean['phrase'].astype(str).str.strip().str.lower().str.split().str.join(' ')\n",
+    "\n",
+    "# Unique phrase-label mapping for group-based split.\n",
+    "# (If a phrase maps to multiple intents, drop it to avoid contradictory supervision.)\n",
+    "df_unique_pairs = df_clean.drop_duplicates(subset=['phrase_norm', 'prompt']).copy()\n",
+    "intent_counts = df_unique_pairs.groupby('phrase_norm')['prompt'].nunique()\n",
+    "ambiguous_phrases = set(intent_counts[intent_counts > 1].index)\n",
+    "\n",
+    "phrase_label_df = df_unique_pairs[~df_unique_pairs['phrase_norm'].isin(ambiguous_phrases)].drop_duplicates(subset=['phrase_norm'])[['phrase_norm', 'prompt']].copy()\n",
+    "\n",
+    "print(f\"Original rows: {len(df)}\")\n",
+    "print(f\"Unique (phrase,intent) pairs: {len(df_unique_pairs)}\")\n",
+    "print(f\"Ambiguous phrases removed: {len(ambiguous_phrases)}\")\n",
+    "print(f\"Unique phrases used for split: {len(phrase_label_df)}\")\n",
+    "\n",
+    "# Split on unique phrases only.\n",
+    "X_pool, phrase_unit, y_pool, intent_unit_phrase = train_test_split(\n",
+    "    phrase_label_df['phrase_norm'],\n",
+    "    phrase_label_df['prompt'],\n",
+    "    stratify=phrase_label_df['prompt'],\n",
+    "    test_size=0.10,\n",
+    "    random_state=4612,\n",
+    ")\n",
+    "\n",
+    "X_train_val, phrase_test, y_train_val, intent_test_phrase = train_test_split(\n",
+    "    X_pool,\n",
+    "    y_pool,\n",
+    "    stratify=y_pool,\n",
+    "    test_size=0.20,\n",
+    "    random_state=4612,\n",
+    ")\n",
+    "\n",
+    "phrase_train, phrase_val, intent_train_phrase, intent_val_phrase = train_test_split(\n",
+    "    X_train_val,\n",
+    "    y_train_val,\n",
+    "    stratify=y_train_val,\n",
+    "    test_size=0.125,\n",
+    "    random_state=4612,\n",
+    ")\n",
+    "\n",
+    "# Expand back to ALL rows (all recordings) for each phrase split.\n",
+    "eligible_rows = df_clean[df_clean['phrase_norm'].isin(set(phrase_label_df['phrase_norm']))].copy()\n",
+    "\n",
+    "train_df = eligible_rows[eligible_rows['phrase_norm'].isin(set(phrase_train))].copy()\n",
+    "val_df = eligible_rows[eligible_rows['phrase_norm'].isin(set(phrase_val))].copy()\n",
+    "test_df = eligible_rows[eligible_rows['phrase_norm'].isin(set(phrase_test))].copy()\n",
+    "unit_df = eligible_rows[eligible_rows['phrase_norm'].isin(set(phrase_unit))].copy()\n",
+    "\n",
+    "sentence_train, intent_train = train_df['phrase_norm'], train_df['prompt']\n",
+    "sentence_val, intent_val = val_df['phrase_norm'], val_df['prompt']\n",
+    "sentence_test, intent_test = test_df['phrase_norm'], test_df['prompt']\n",
+    "sentence_unit, intent_unit = unit_df['phrase_norm'], unit_df['prompt']\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 22,
+   "id": "6b8c01df-a521-4f4b-90f1-59fb577697d0",
+   "metadata": {
+    "include-cell-in-app": true
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "#examples in training set: 441\n",
+      "#examples in validation set: 63\n",
+      "#examples in test set: 126\n",
+      "#examples in unseen unit holdout: 71\n"
+     ]
+    }
+   ],
+   "source": [
+    "print(\n",
+    "    f\"Rows -> train: {len(sentence_train)} | val: {len(sentence_val)} | test: {len(sentence_test)} | unseen_unit: {len(sentence_unit)}\\n\"\n",
+    "    f\"Unique phrases -> train: {phrase_train.nunique()} | val: {phrase_val.nunique()} | test: {phrase_test.nunique()} | unseen_unit: {phrase_unit.nunique()}\"\n",
+    ")\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "091ff99d-6891-48f9-a12e-d0cc37f3ec24",
+   "metadata": {
+    "include-cell-in-app": true
+   },
+   "source": [
+    "## 4. Tokenization and input formatting\n",
+    "\n",
+    "Let's prep the input data to the correct format before training as follows:\n",
+    "\n",
+    "* tokenizing all sentences \n",
+    "* padding and truncating all sentences to the same length. \n",
+    "* Creating the attention masks which explicitly differentiate real tokens from [PAD] tokens. 0 or 1.\n",
+    "* encoding the label \"intent\" to numbers. 25 intents to 25 numbers.\n",
+    "* creating DataLoaders for our training, validation and test sets"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 25,
+   "id": "cf219379-0e01-4c39-9c16-2368a2242ea3",
+   "metadata": {
+    "include-cell-in-app": true
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Requirement already satisfied: ipywidgets==8.* in /Users/danicasimic/torch_env/lib/python3.12/site-packages (8.1.8)\n",
+      "Requirement already satisfied: jupyterlab-widgets==3.* in /Users/danicasimic/torch_env/lib/python3.12/site-packages (3.0.16)\n",
+      "Requirement already satisfied: widgetsnbextension==4.* in /Users/danicasimic/torch_env/lib/python3.12/site-packages (4.0.15)\n",
+      "Requirement already satisfied: comm>=0.1.3 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from ipywidgets==8.*) (0.2.3)\n",
+      "Requirement already satisfied: ipython>=6.1.0 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from ipywidgets==8.*) (9.6.0)\n",
+      "Requirement already satisfied: traitlets>=4.3.1 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from ipywidgets==8.*) (5.14.3)\n",
+      "Requirement already satisfied: decorator in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from ipython>=6.1.0->ipywidgets==8.*) (5.2.1)\n",
+      "Requirement already satisfied: ipython-pygments-lexers in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from ipython>=6.1.0->ipywidgets==8.*) (1.1.1)\n",
+      "Requirement already satisfied: jedi>=0.16 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from ipython>=6.1.0->ipywidgets==8.*) (0.19.2)\n",
+      "Requirement already satisfied: matplotlib-inline in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from ipython>=6.1.0->ipywidgets==8.*) (0.1.7)\n",
+      "Requirement already satisfied: pexpect>4.3 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from ipython>=6.1.0->ipywidgets==8.*) (4.9.0)\n",
+      "Requirement already satisfied: prompt_toolkit<3.1.0,>=3.0.41 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from ipython>=6.1.0->ipywidgets==8.*) (3.0.52)\n",
+      "Requirement already satisfied: pygments>=2.4.0 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from ipython>=6.1.0->ipywidgets==8.*) (2.19.2)\n",
+      "Requirement already satisfied: stack_data in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from ipython>=6.1.0->ipywidgets==8.*) (0.6.3)\n",
+      "Requirement already satisfied: wcwidth in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from prompt_toolkit<3.1.0,>=3.0.41->ipython>=6.1.0->ipywidgets==8.*) (0.2.14)\n",
+      "Requirement already satisfied: parso<0.9.0,>=0.8.4 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from jedi>=0.16->ipython>=6.1.0->ipywidgets==8.*) (0.8.5)\n",
+      "Requirement already satisfied: ptyprocess>=0.5 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from pexpect>4.3->ipython>=6.1.0->ipywidgets==8.*) (0.7.0)\n",
+      "Requirement already satisfied: executing>=1.2.0 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from stack_data->ipython>=6.1.0->ipywidgets==8.*) (2.2.1)\n",
+      "Requirement already satisfied: asttokens>=2.1.0 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from stack_data->ipython>=6.1.0->ipywidgets==8.*) (3.0.0)\n",
+      "Requirement already satisfied: pure-eval in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from stack_data->ipython>=6.1.0->ipywidgets==8.*) (0.2.3)\n",
+      "\n",
+      "\u001b[1m[\u001b[0m\u001b[34;49mnotice\u001b[0m\u001b[1;39;49m]\u001b[0m\u001b[39;49m A new release of pip is available: \u001b[0m\u001b[31;49m25.2\u001b[0m\u001b[39;49m -> \u001b[0m\u001b[32;49m26.0.1\u001b[0m\n",
+      "\u001b[1m[\u001b[0m\u001b[34;49mnotice\u001b[0m\u001b[1;39;49m]\u001b[0m\u001b[39;49m To update, run: \u001b[0m\u001b[32;49m/Users/danicasimic/torch_env/bin/python -m pip install --upgrade pip\u001b[0m\n",
+      "Note: you may need to restart the kernel to use updated packages.\n"
+     ]
+    }
+   ],
+   "source": [
+    "pip install --upgrade \"ipywidgets==8.*\" \"jupyterlab-widgets==3.*\" \"widgetsnbextension==4.*\"\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 27,
+   "id": "ef475867-0f1f-401f-89c5-a693b9bbf329",
+   "metadata": {
+    "include-cell-in-app": true
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "usage: jupyter [-h] [--version] [--config-dir] [--data-dir] [--runtime-dir]\n",
+      "               [--paths] [--json] [--debug]\n",
+      "               [subcommand]\n",
+      "\n",
+      "Jupyter: Interactive Computing\n",
+      "\n",
+      "positional arguments:\n",
+      "  subcommand     the subcommand to launch\n",
+      "\n",
+      "options:\n",
+      "  -h, --help     show this help message and exit\n",
+      "  --version      show the versions of core jupyter packages and exit\n",
+      "  --config-dir   show Jupyter config dir\n",
+      "  --data-dir     show Jupyter data dir\n",
+      "  --runtime-dir  show Jupyter runtime dir\n",
+      "  --paths        show all Jupyter paths. Add --json for machine-readable\n",
+      "                 format.\n",
+      "  --json         output paths as machine-readable json\n",
+      "  --debug        output debug information about paths\n",
+      "\n",
+      "Available subcommands: console dejavu events execute kernel kernelspec lab\n",
+      "labextension labhub migrate nbconvert notebook qtconsole run server\n",
+      "troubleshoot trust\n",
+      "\n",
+      "Jupyter command `jupyter-nbextension` not found.\n"
+     ]
+    }
+   ],
+   "source": [
+    "!jupyter nbextension enable --py widgetsnbextension\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 29,
+   "id": "2d34ebbd-1134-479e-93f7-69acca6641ca",
+   "metadata": {
+    "include-cell-in-app": true
+   },
+   "outputs": [],
+   "source": [
+    "# Defining some key variables that will be used later on in the training\n",
+    "TRAIN_BATCH_SIZE =32\n",
+    "VALID_BATCH_SIZE = 64\n",
+    "EPSILON = 1e-08\n",
+    "EPOCHS = 4\n",
+    "LEARNING_RATE = 2e-5\n",
+    "SEED = 1215\n",
+    "from transformers import BertTokenizer\n",
+    "tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', do_lower_case=True)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 30,
+   "id": "63e187d7-c3f0-4998-8876-63f90d2e42f0",
+   "metadata": {
+    "include-cell-in-app": true
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Max sentence length:39 \n",
+      "Mean sentence length:14\n"
+     ]
+    }
+   ],
+   "source": [
+    "max_len = 0\n",
+    "input = []\n",
+    "length=[]\n",
+    "# For every sentence...\n",
+    "for sent in sentence_train:\n",
+    "\n",
+    "    # Tokenize the text and add special tokens--`[CLS]` and `[SEP]` tokens.\n",
+    "    input_ids = tokenizer.encode(sent, add_special_tokens=True)\n",
+    "    input.append(input_ids)\n",
+    "    length.append(len(input_ids))\n",
+    "    # Update the maximum sentence length.\n",
+    "    max_len = max(max_len, len(input_ids))\n",
+    "    mean_len = sum(length)/len(length)\n",
+    "#39 tokens is the maximum number of tokens in a sentence (transcription). Also, a sentence has 14 tokens on average.\n",
+    "print('Max sentence length:%d \\nMean sentence length:%d' % (max_len,mean_len))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 31,
+   "id": "63f175da-8b12-433d-86c5-24a63ab95353",
+   "metadata": {
+    "include-cell-in-app": true
+   },
+   "outputs": [],
+   "source": [
+    "# create a function to tokenize sentences.  \n",
+    "def tokenize(sentence):\n",
+    "  batch = tokenizer(list(sentence),             \n",
+    "                  #Pad or truncate all sentences to the same length. Create the attention masks which explicitly differentiate real tokens from [PAD] tokens.\n",
+    "                  padding=True, \n",
+    "                  truncation=True,\n",
+    "                  return_tensors=\"pt\")\n",
+    "  return batch"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 35,
+   "id": "946c4d04-d7be-4270-861d-6a2dc0d4e5ca",
+   "metadata": {
+    "include-cell-in-app": true
+   },
+   "outputs": [],
+   "source": [
+    "tok_train = tokenize(sentence_train)\n",
+    "tok_val = tokenize(sentence_val)\n",
+    "tok_test = tokenize(sentence_test)\n",
+    "tok_unit = tokenize(sentence_unit)\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 37,
+   "id": "4dd372a2-def3-454e-a342-8afb60718e06",
+   "metadata": {
+    "include-cell-in-app": true
+   },
+   "outputs": [],
+   "source": [
+    "from sklearn.preprocessing import LabelEncoder\n",
+    "# Fit label encoder ONLY on train set, then transform val/test/unseen holdout.\n",
+    "LE = LabelEncoder()\n",
+    "label_train = torch.tensor(LE.fit_transform(intent_train), dtype=torch.long)\n",
+    "label_val = torch.tensor(LE.transform(intent_val), dtype=torch.long)\n",
+    "label_test = torch.tensor(LE.transform(intent_test), dtype=torch.long)\n",
+    "label_unit = torch.tensor(LE.transform(intent_unit), dtype=torch.long)\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 39,
+   "id": "22621d42-87ec-432c-ae50-15e6a9f31f36",
+   "metadata": {
+    "include-cell-in-app": true
+   },
+   "outputs": [],
+   "source": [
+    "from torch.utils.data import TensorDataset\n",
+    "\n",
+    "train_dataset = TensorDataset(tok_train['input_ids'], tok_train['attention_mask'], label_train)\n",
+    "validation_dataset = TensorDataset(tok_val['input_ids'], tok_val['attention_mask'], label_val)\n",
+    "test_dataset = TensorDataset(tok_test['input_ids'], tok_test['attention_mask'], label_test)\n",
+    "unit_dataset = TensorDataset(tok_unit['input_ids'], tok_unit['attention_mask'], label_unit)\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 41,
+   "id": "db14b590-daac-4d58-981c-451deb5ae3c5",
+   "metadata": {
+    "include-cell-in-app": true
+   },
+   "outputs": [],
+   "source": [
+    "from torch.utils.data import DataLoader, RandomSampler, SequentialSampler\n",
+    "\n",
+    "train_dataloader = DataLoader(\n",
+    "    train_dataset,\n",
+    "    sampler=RandomSampler(train_dataset),\n",
+    "    batch_size=TRAIN_BATCH_SIZE,\n",
+    ")\n",
+    "\n",
+    "validation_dataloader = DataLoader(\n",
+    "    validation_dataset,\n",
+    "    sampler=SequentialSampler(validation_dataset),\n",
+    "    batch_size=VALID_BATCH_SIZE,\n",
+    ")\n",
+    "\n",
+    "test_dataloader = DataLoader(\n",
+    "    test_dataset,\n",
+    "    sampler=SequentialSampler(test_dataset),\n",
+    "    batch_size=VALID_BATCH_SIZE,\n",
+    ")\n",
+    "\n",
+    "unit_dataloader = DataLoader(\n",
+    "    unit_dataset,\n",
+    "    sampler=SequentialSampler(unit_dataset),\n",
+    "    batch_size=VALID_BATCH_SIZE,\n",
+    ")\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "f051a333-7947-4c96-b95e-fe395d9de6bf",
+   "metadata": {
+    "include-cell-in-app": true
+   },
+   "source": [
+    "## 5. Train BERT classification model\n",
+    "\n",
+    "I use BertForSequenceClassification, a BERT model with an added single linear layer on top for classification. As we feed input data, the entire pre-trained BERT model and the additional untrained classification layer is trained on our specific task.\n",
+    "\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 44,
+   "id": "26a351d9-e954-4c47-9c92-5500780cf605",
+   "metadata": {
+    "include-cell-in-app": true
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "PYTHON: /Users/danicasimic/torch_env/bin/python\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "\u001b[33mWARNING: Package(s) not found: tensorflow\u001b[0m\u001b[33m\n",
+      "\u001b[0m\u001b[33mWARNING: Package(s) not found: tensorflow-macos\u001b[0m\u001b[33m\n",
+      "\u001b[0m"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Name: protobuf\n",
+      "Version: 4.25.3\n",
+      "Summary: \n",
+      "Home-page: https://developers.google.com/protocol-buffers/\n",
+      "Author: protobuf@googlegroups.com\n",
+      "Author-email: protobuf@googlegroups.com\n",
+      "License: 3-Clause BSD License\n",
+      "Location: /Users/danicasimic/torch_env/lib/python3.12/site-packages\n",
+      "Requires: \n",
+      "Required-by: googleapis-common-protos, tensorboard\n"
+     ]
+    },
+    {
+     "data": {
+      "text/plain": [
+       "CompletedProcess(args=['/Users/danicasimic/torch_env/bin/python', '-m', 'pip', 'show', 'protobuf'], returncode=0)"
+      ]
+     },
+     "execution_count": 44,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "import sys, subprocess\n",
+    "print(\"PYTHON:\", sys.executable)\n",
+    "subprocess.run([sys.executable, \"-m\", \"pip\", \"show\", \"tensorflow\"])\n",
+    "subprocess.run([sys.executable, \"-m\", \"pip\", \"show\", \"tensorflow-macos\"])\n",
+    "subprocess.run([sys.executable, \"-m\", \"pip\", \"show\", \"protobuf\"])"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 46,
+   "id": "7821c362-f808-43d2-95e4-9ef098244c5b",
+   "metadata": {
+    "include-cell-in-app": true
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Using device: mps\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "Some weights of BertForSequenceClassification were not initialized from the model checkpoint at bert-base-uncased and are newly initialized: ['classifier.bias', 'classifier.weight']\n",
+      "You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Model on: mps:0\n"
+     ]
+    }
+   ],
+   "source": [
+    "from transformers import BertForSequenceClassification, BertConfig, get_linear_schedule_with_warmup\n",
+    "import torch\n",
+    "from torch.optim import AdamW\n",
+    "\n",
+    "device = torch.device(\"mps\" if torch.backends.mps.is_available() else \"cpu\")\n",
+    "print(\"Using device:\", device)\n",
+    "\n",
+    "model = BertForSequenceClassification.from_pretrained(\n",
+    "    \"bert-base-uncased\",\n",
+    "    num_labels=len(LE.classes_)\n",
+    ")\n",
+    "model.to(device)\n",
+    "\n",
+    "optimizer = AdamW(\n",
+    "    model.parameters(),\n",
+    "    lr=LEARNING_RATE,\n",
+    "    eps=EPSILON\n",
+    ")\n",
+    "\n",
+    "total_steps = len(train_dataloader) * EPOCHS\n",
+    "scheduler = get_linear_schedule_with_warmup(\n",
+    "    optimizer,\n",
+    "    num_warmup_steps=0,\n",
+    "    num_training_steps=total_steps\n",
+    ")\n",
+    "\n",
+    "print(\"Model on:\", next(model.parameters()).device)\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 48,
+   "id": "120e8b41-1758-452e-9807-b5ed70c95a82",
+   "metadata": {
+    "include-cell-in-app": true
+   },
+   "outputs": [],
+   "source": [
+    "# Function to calcuate the accuracy of the model\n",
+    "\n",
+    "def calcuate_accu(big_idx, targets):\n",
+    "    n_correct = (big_idx==targets).sum().item()\n",
+    "    return n_correct"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 50,
+   "id": "e937a4fb-8c18-4c00-9212-fb76e6c2a750",
+   "metadata": {
+    "include-cell-in-app": true
+   },
+   "outputs": [],
+   "source": [
+    "import time\n",
+    "import datetime\n",
+    "\n",
+    "def format_time(elapsed):\n",
+    "    #Takes a time in seconds and returns a string hh:mm:ss\n",
+    "    # Round to the nearest second.\n",
+    "    elapsed_rounded = int(round((elapsed)))   \n",
+    "    # Format as hh:mm:ss\n",
+    "    return str(datetime.timedelta(seconds=elapsed_rounded))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 52,
+   "id": "be092b73-8e94-47e0-b0d4-0c167760cffe",
+   "metadata": {
+    "include-cell-in-app": true
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Requirement already satisfied: tensorboard in /Users/danicasimic/torch_env/lib/python3.12/site-packages (2.20.0)\n",
+      "Requirement already satisfied: absl-py>=0.4 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from tensorboard) (2.3.1)\n",
+      "Requirement already satisfied: grpcio>=1.48.2 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from tensorboard) (1.75.1)\n",
+      "Requirement already satisfied: markdown>=2.6.8 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from tensorboard) (3.9)\n",
+      "Requirement already satisfied: numpy>=1.12.0 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from tensorboard) (2.3.3)\n",
+      "Requirement already satisfied: packaging in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from tensorboard) (25.0)\n",
+      "Requirement already satisfied: pillow in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from tensorboard) (11.3.0)\n",
+      "Requirement already satisfied: protobuf!=4.24.0,>=3.19.6 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from tensorboard) (4.25.3)\n",
+      "Requirement already satisfied: setuptools>=41.0.0 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from tensorboard) (80.9.0)\n",
+      "Requirement already satisfied: tensorboard-data-server<0.8.0,>=0.7.0 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from tensorboard) (0.7.2)\n",
+      "Requirement already satisfied: werkzeug>=1.0.1 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from tensorboard) (3.1.3)\n",
+      "Requirement already satisfied: typing-extensions~=4.12 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from grpcio>=1.48.2->tensorboard) (4.15.0)\n",
+      "Requirement already satisfied: MarkupSafe>=2.1.1 in /Users/danicasimic/torch_env/lib/python3.12/site-packages (from werkzeug>=1.0.1->tensorboard) (3.0.3)\n",
+      "\n",
+      "\u001b[1m[\u001b[0m\u001b[34;49mnotice\u001b[0m\u001b[1;39;49m]\u001b[0m\u001b[39;49m A new release of pip is available: \u001b[0m\u001b[31;49m25.2\u001b[0m\u001b[39;49m -> \u001b[0m\u001b[32;49m26.0.1\u001b[0m\n",
+      "\u001b[1m[\u001b[0m\u001b[34;49mnotice\u001b[0m\u001b[1;39;49m]\u001b[0m\u001b[39;49m To update, run: \u001b[0m\u001b[32;49m/Users/danicasimic/torch_env/bin/python -m pip install --upgrade pip\u001b[0m\n",
+      "Note: you may need to restart the kernel to use updated packages.\n"
+     ]
+    }
+   ],
+   "source": [
+    "%pip install tensorboard\n",
+    "\n",
+    "from torch.utils.tensorboard import SummaryWriter\n",
+    "\n",
+    "# default `log_dir` is \"runs\" - we'll be more specific here\n",
+    "writer = SummaryWriter('runs/Tensorboard')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 54,
+   "id": "e4c3397a-1cf1-4382-90f3-aef9b0c757fc",
+   "metadata": {
+    "include-cell-in-app": true
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Training on: mps\n"
+     ]
+    }
+   ],
+   "source": [
+    "import time\n",
+    "import random\n",
+    "import numpy as np\n",
+    "import torch\n",
+    "\n",
+    "# ✅ Za konzistentnost\n",
+    "random.seed(SEED)\n",
+    "np.random.seed(SEED)\n",
+    "torch.manual_seed(SEED)\n",
+    "\n",
+    "# ✅ Device za Apple Silicon\n",
+    "device = torch.device(\"mps\" if torch.backends.mps.is_available() else \"cpu\")\n",
+    "print(\"Training on:\", device)\n",
+    "\n",
+    "def calculate_accu(preds, labels):\n",
+    "    return (preds == labels).sum().item()\n",
+    "\n",
+    "def format_time(elapsed):\n",
+    "    return time.strftime(\"%H:%M:%S\", time.gmtime(elapsed))\n",
+    "\n",
+    "def train(epochs):\n",
+    "    total_t0 = time.time()\n",
+    "\n",
+    "    for epoch in range(epochs):\n",
+    "        print(f\"\\n======== Epoch {epoch + 1} / {epochs} ========\")\n",
+    "        print(\"Training...\")\n",
+    "\n",
+    "        t0 = time.time()\n",
+    "        model.train()\n",
+    "\n",
+    "        total_tr_loss = 0\n",
+    "        total_correct = 0\n",
+    "        total_examples = 0\n",
+    "\n",
+    "        # ✅ Za svaki batch\n",
+    "        for step, batch in enumerate(train_dataloader):\n",
+    "            input_ids = batch[0].to(device)\n",
+    "            attention_mask = batch[1].to(device)\n",
+    "            labels = batch[2].to(device)\n",
+    "\n",
+    "            # Reset gradijenata\n",
+    "            optimizer.zero_grad()\n",
+    "\n",
+    "            # Forward\n",
+    "            outputs = model(\n",
+    "                input_ids=input_ids,\n",
+    "                attention_mask=attention_mask,\n",
+    "                labels=labels\n",
+    "            )\n",
+    "\n",
+    "            loss = outputs.loss\n",
+    "            logits = outputs.logits\n",
+    "\n",
+    "            total_tr_loss += loss.item()\n",
+    "\n",
+    "            # Accuracy\n",
+    "            preds = torch.argmax(logits, dim=1)\n",
+    "            total_correct += calculate_accu(preds, labels)\n",
+    "            total_examples += labels.size(0)\n",
+    "\n",
+    "            # Backward\n",
+    "            loss.backward()\n",
+    "            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)\n",
+    "            optimizer.step()\n",
+    "            scheduler.step()\n",
+    "\n",
+    "            # Periodični prikaz\n",
+    "            if step % 20 == 19:\n",
+    "                avg_loss = total_tr_loss / (step + 1)\n",
+    "                avg_acc = total_correct / total_examples\n",
+    "                print(f\"  Step {step+1}/{len(train_dataloader)} | Loss: {avg_loss:.4f} | Acc: {avg_acc:.4f}\")\n",
+    "\n",
+    "        # ✅ Kraj epohe\n",
+    "        epoch_loss = total_tr_loss / len(train_dataloader)\n",
+    "        epoch_acc = total_correct / total_examples\n",
+    "        epoch_time = format_time(time.time() - t0)\n",
+    "\n",
+    "        print(f\"\\nEpoch {epoch+1} finished\")\n",
+    "        print(f\"  Average loss: {epoch_loss:.4f}\")\n",
+    "        print(f\"  Average accuracy: {epoch_acc:.4f}\")\n",
+    "        print(f\"  Epoch training time: {epoch_time}\")\n",
+    "\n",
+    "    total_training_time = format_time(time.time() - total_t0)\n",
+    "    print(\"\\nTraining complete!\")\n",
+    "    print(\"Total training time:\", total_training_time)\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 56,
+   "id": "ec559947-a6d5-4d28-a9c5-dda8d9fe9ad1",
+   "metadata": {
+    "include-cell-in-app": true
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "\n",
+      "======== Epoch 1 / 4 ========\n",
+      "Training...\n",
+      "\n",
+      "Epoch 1 finished\n",
+      "  Average loss: 3.2580\n",
+      "  Average accuracy: 0.0408\n",
+      "  Epoch training time: 00:00:08\n",
+      "\n",
+      "======== Epoch 2 / 4 ========\n",
+      "Training...\n",
+      "\n",
+      "Epoch 2 finished\n",
+      "  Average loss: 3.1861\n",
+      "  Average accuracy: 0.0771\n",
+      "  Epoch training time: 00:00:04\n",
+      "\n",
+      "======== Epoch 3 / 4 ========\n",
+      "Training...\n",
+      "\n",
+      "Epoch 3 finished\n",
+      "  Average loss: 3.1079\n",
+      "  Average accuracy: 0.0816\n",
+      "  Epoch training time: 00:00:04\n",
+      "\n",
+      "======== Epoch 4 / 4 ========\n",
+      "Training...\n",
+      "\n",
+      "Epoch 4 finished\n",
+      "  Average loss: 3.0782\n",
+      "  Average accuracy: 0.1020\n",
+      "  Epoch training time: 00:00:04\n",
+      "\n",
+      "Training complete!\n",
+      "Total training time: 00:00:21\n"
+     ]
+    }
+   ],
+   "source": [
+    "train(EPOCHS)\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 57,
+   "id": "c4f63969-30c3-44f4-a164-f0cd6ee04970",
+   "metadata": {
+    "include-cell-in-app": true
+   },
+   "outputs": [],
+   "source": [
+    "from sklearn.metrics import classification_report\n",
+    "import numpy as np\n",
+    "\n",
+    "def evaluate_split(model, data_loader, split_name=\"split\"):\n",
+    "    model.eval()\n",
+    "    eval_loss = 0\n",
+    "    n_correct = 0\n",
+    "    n_examples = 0\n",
+    "    all_preds = []\n",
+    "    all_targets = []\n",
+    "\n",
+    "    loss_function = torch.nn.CrossEntropyLoss()\n",
+    "\n",
+    "    with torch.no_grad():\n",
+    "        for _, data in enumerate(data_loader, 0):\n",
+    "            ids = data[0].to(device, dtype=torch.long)\n",
+    "            mask = data[1].to(device, dtype=torch.long)\n",
+    "            targets = data[2].to(device, dtype=torch.long)\n",
+    "\n",
+    "            outputs = model(ids, mask)\n",
+    "            logits = outputs[0]\n",
+    "\n",
+    "            loss = loss_function(logits, targets)\n",
+    "            eval_loss += loss.item()\n",
+    "\n",
+    "            _, pred_idx = torch.max(logits, dim=1)\n",
+    "            n_correct += calcuate_accu(pred_idx, targets)\n",
+    "            n_examples += targets.size(0)\n",
+    "\n",
+    "            all_preds.extend(pred_idx.detach().cpu().numpy())\n",
+    "            all_targets.extend(targets.detach().cpu().numpy())\n",
+    "\n",
+    "    avg_loss = eval_loss / len(data_loader)\n",
+    "    accuracy = (n_correct * 100) / n_examples\n",
+    "\n",
+    "    print(f\"\\n[{split_name}] Loss: {avg_loss:.4f}\")\n",
+    "    print(f\"[{split_name}] Accuracy: {accuracy:.2f}%\")\n",
+    "    print(f\"[{split_name}] Classification report:\")\n",
+    "    print(classification_report(\n",
+    "        np.array(all_targets),\n",
+    "        np.array(all_preds),\n",
+    "        target_names=LE.classes_,\n",
+    "        digits=4,\n",
+    "        zero_division=0,\n",
+    "    ))\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 58,
+   "id": "8e4cc287-2c4c-4f93-9dcc-c264bdbfab9c",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "\n",
+      "[Validation] Loss: 3.1626\n",
+      "[Validation] Accuracy: 4.76%\n",
+      "[Validation] Classification report:\n",
+      "                    precision    recall  f1-score   support\n",
+      "\n",
+      "              Acne     0.0000    0.0000    0.0000         3\n",
+      "         Back pain     0.0000    0.0000    0.0000         2\n",
+      "     Blurry vision     0.0000    0.0000    0.0000         2\n",
+      "   Body feels weak     0.0000    0.0000    0.0000         2\n",
+      "             Cough     0.0000    0.0000    0.0000         3\n",
+      "          Ear ache     0.0000    0.0000    0.0000         3\n",
+      "    Emotional pain     0.0000    0.0000    0.0000         2\n",
+      "      Feeling cold     0.0000    0.0000    0.0000         3\n",
+      "     Feeling dizzy     0.0000    0.0000    0.0000         3\n",
+      "         Foot ache     0.0000    0.0000    0.0000         2\n",
+      "  Hair falling out     0.0000    0.0000    0.0000         2\n",
+      "    Hard to breath     0.0000    0.0000    0.0000         3\n",
+      "         Head ache     0.0000    0.0000    0.0000         2\n",
+      "       Heart hurts     0.0000    0.0000    0.0000         3\n",
+      "    Infected wound     0.0294    0.3333    0.0541         3\n",
+      "Injury from sports     0.2000    0.5000    0.2857         2\n",
+      "     Internal pain     0.0000    0.0000    0.0000         2\n",
+      "        Joint pain     0.0000    0.0000    0.0000         3\n",
+      "         Knee pain     0.0000    0.0000    0.0000         3\n",
+      "       Muscle pain     0.0000    0.0000    0.0000         3\n",
+      "         Neck pain     0.0000    0.0000    0.0000         2\n",
+      "        Open wound     0.0000    0.0000    0.0000         2\n",
+      "     Shoulder pain     0.0000    0.0000    0.0000         3\n",
+      "        Skin issue     0.2500    0.3333    0.2857         3\n",
+      "      Stomach ache     0.0000    0.0000    0.0000         2\n",
+      "\n",
+      "          accuracy                         0.0476        63\n",
+      "         macro avg     0.0192    0.0467    0.0250        63\n",
+      "      weighted avg     0.0197    0.0476    0.0252        63\n",
+      "\n",
+      "\n",
+      "[Test] Loss: 3.1473\n",
+      "[Test] Accuracy: 7.94%\n",
+      "[Test] Classification report:\n",
+      "                    precision    recall  f1-score   support\n",
+      "\n",
+      "              Acne     0.0000    0.0000    0.0000         6\n",
+      "         Back pain     0.0000    0.0000    0.0000         4\n",
+      "     Blurry vision     0.0000    0.0000    0.0000         4\n",
+      "   Body feels weak     0.0000    0.0000    0.0000         5\n",
+      "             Cough     0.0000    0.0000    0.0000         6\n",
+      "          Ear ache     0.0000    0.0000    0.0000         5\n",
+      "    Emotional pain     0.0000    0.0000    0.0000         4\n",
+      "      Feeling cold     0.0000    0.0000    0.0000         5\n",
+      "     Feeling dizzy     0.5000    0.2500    0.3333         4\n",
+      "         Foot ache     0.0000    0.0000    0.0000         5\n",
+      "  Hair falling out     0.0000    0.0000    0.0000         5\n",
+      "    Hard to breath     0.0000    0.0000    0.0000         4\n",
+      "         Head ache     0.0000    0.0000    0.0000         5\n",
+      "       Heart hurts     0.0000    0.0000    0.0000         6\n",
+      "    Infected wound     0.0822    1.0000    0.1519         6\n",
+      "Injury from sports     0.0000    0.0000    0.0000         5\n",
+      "     Internal pain     0.0690    0.4000    0.1176         5\n",
+      "        Joint pain     0.0000    0.0000    0.0000         6\n",
+      "         Knee pain     0.5000    0.1667    0.2500         6\n",
+      "       Muscle pain     0.0000    0.0000    0.0000         5\n",
+      "         Neck pain     0.0000    0.0000    0.0000         5\n",
+      "        Open wound     0.0000    0.0000    0.0000         4\n",
+      "     Shoulder pain     0.0000    0.0000    0.0000         6\n",
+      "        Skin issue     0.0000    0.0000    0.0000         5\n",
+      "      Stomach ache     0.0000    0.0000    0.0000         5\n",
+      "\n",
+      "          accuracy                         0.0794       126\n",
+      "         macro avg     0.0460    0.0727    0.0341       126\n",
+      "      weighted avg     0.0463    0.0794    0.0344       126\n",
+      "\n",
+      "\n",
+      "[Unseen Unit Holdout] Loss: 2.9903\n",
+      "[Unseen Unit Holdout] Accuracy: 5.63%\n",
+      "[Unseen Unit Holdout] Classification report:\n",
+      "                    precision    recall  f1-score   support\n",
+      "\n",
+      "              Acne     0.5000    0.3333    0.4000         3\n",
+      "         Back pain     0.0000    0.0000    0.0000         3\n",
+      "     Blurry vision     0.0000    0.0000    0.0000         3\n",
+      "   Body feels weak     0.0000    0.0000    0.0000         2\n",
+      "             Cough     0.0000    0.0000    0.0000         3\n",
+      "          Ear ache     0.0000    0.0000    0.0000         3\n",
+      "    Emotional pain     0.0000    0.0000    0.0000         2\n",
+      "      Feeling cold     0.0000    0.0000    0.0000         3\n",
+      "     Feeling dizzy     0.0000    0.0000    0.0000         3\n",
+      "         Foot ache     0.0000    0.0000    0.0000         3\n",
+      "  Hair falling out     0.0000    0.0000    0.0000         3\n",
+      "    Hard to breath     0.0000    0.0000    0.0000         2\n",
+      "         Head ache     0.0000    0.0000    0.0000         3\n",
+      "       Heart hurts     0.0000    0.0000    0.0000         3\n",
+      "    Infected wound     0.0714    1.0000    0.1333         3\n",
+      "Injury from sports     0.0000    0.0000    0.0000         3\n",
+      "     Internal pain     0.0000    0.0000    0.0000         3\n",
+      "        Joint pain     0.0000    0.0000    0.0000         3\n",
+      "         Knee pain     0.0000    0.0000    0.0000         3\n",
+      "       Muscle pain     0.0000    0.0000    0.0000         3\n",
+      "         Neck pain     0.0000    0.0000    0.0000         2\n",
+      "        Open wound     0.0000    0.0000    0.0000         2\n",
+      "     Shoulder pain     0.0000    0.0000    0.0000         4\n",
+      "        Skin issue     0.0000    0.0000    0.0000         3\n",
+      "      Stomach ache     0.0000    0.0000    0.0000         3\n",
+      "\n",
+      "          accuracy                         0.0563        71\n",
+      "         macro avg     0.0229    0.0533    0.0213        71\n",
+      "      weighted avg     0.0241    0.0563    0.0225        71\n",
+      "\n"
+     ]
+    }
+   ],
+   "source": [
+    "evaluate_split(model, validation_dataloader, split_name=\"Validation\")\n",
+    "evaluate_split(model, test_dataloader, split_name=\"Test\")\n",
+    "evaluate_split(model, unit_dataloader, split_name=\"Unseen Unit Holdout\")\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 36,
+   "id": "5c399668-6f7c-4bbe-a915-ebf918309bef",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Overlap between train and val: 443 examples\n"
+     ]
+    }
+   ],
+   "source": [
+    "train_texts = set(sentence_train)\n",
+    "val_texts = set(sentence_val)\n",
+    "test_texts = set(sentence_test)\n",
+    "unit_texts = set(sentence_unit)\n",
+    "\n",
+    "print(f\"Overlap train-val: {len(train_texts.intersection(val_texts))}\")\n",
+    "print(f\"Overlap train-test: {len(train_texts.intersection(test_texts))}\")\n",
+    "print(f\"Overlap train-unit: {len(train_texts.intersection(unit_texts))}\")\n",
+    "print(f\"Overlap val-test: {len(val_texts.intersection(test_texts))}\")\n",
+    "print(f\"Overlap val-unit: {len(val_texts.intersection(unit_texts))}\")\n",
+    "print(f\"Overlap test-unit: {len(test_texts.intersection(unit_texts))}\")\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 8. Advanced Evaluation and Insights\n",
+    "\n",
+    "This section adds deeper diagnostics on the **unseen unit holdout**: confusion matrices, ROC curves, strongest confusions, class-level F1/support, and confidence behavior.\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import numpy as np\n",
+    "import matplotlib.pyplot as plt\n",
+    "import seaborn as sns\n",
+    "import pandas as pd\n",
+    "\n",
+    "from sklearn.metrics import (\n",
+    "    confusion_matrix,\n",
+    "    classification_report,\n",
+    "    roc_curve,\n",
+    "    auc,\n",
+    "    f1_score,\n",
+    ")\n",
+    "from sklearn.preprocessing import label_binarize\n",
+    "\n",
+    "\n",
+    "def collect_predictions(model, data_loader):\n",
+    "    model.eval()\n",
+    "    all_targets = []\n",
+    "    all_preds = []\n",
+    "    all_probs = []\n",
+    "\n",
+    "    with torch.no_grad():\n",
+    "        for batch in data_loader:\n",
+    "            ids = batch[0].to(device, dtype=torch.long)\n",
+    "            mask = batch[1].to(device, dtype=torch.long)\n",
+    "            targets = batch[2].to(device, dtype=torch.long)\n",
+    "\n",
+    "            outputs = model(ids, mask)\n",
+    "            logits = outputs[0]\n",
+    "            probs = torch.softmax(logits, dim=1)\n",
+    "            preds = torch.argmax(probs, dim=1)\n",
+    "\n",
+    "            all_targets.extend(targets.detach().cpu().numpy())\n",
+    "            all_preds.extend(preds.detach().cpu().numpy())\n",
+    "            all_probs.extend(probs.detach().cpu().numpy())\n",
+    "\n",
+    "    return np.array(all_targets), np.array(all_preds), np.array(all_probs)\n",
+    "\n",
+    "\n",
+    "y_true_u, y_pred_u, y_prob_u = collect_predictions(model, unit_dataloader)\n",
+    "label_names = LE.classes_\n",
+    "\n",
+    "print(f\"Unseen unit samples: {len(y_true_u)}\")\n",
+    "print(f\"Num classes: {len(label_names)}\")\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Confusion matrix (counts and normalized)\n",
+    "cm_counts = confusion_matrix(y_true_u, y_pred_u)\n",
+    "cm_norm = confusion_matrix(y_true_u, y_pred_u, normalize='true')\n",
+    "\n",
+    "fig, axes = plt.subplots(1, 2, figsize=(22, 9))\n",
+    "\n",
+    "sns.heatmap(\n",
+    "    cm_counts,\n",
+    "    ax=axes[0],\n",
+    "    cmap='Blues',\n",
+    "    cbar=False,\n",
+    "    xticklabels=label_names,\n",
+    "    yticklabels=label_names,\n",
+    ")\n",
+    "axes[0].set_title('Confusion Matrix (Counts) - Unseen Unit Holdout')\n",
+    "axes[0].set_xlabel('Predicted')\n",
+    "axes[0].set_ylabel('True')\n",
+    "axes[0].tick_params(axis='x', rotation=75)\n",
+    "axes[0].tick_params(axis='y', rotation=0)\n",
+    "\n",
+    "sns.heatmap(\n",
+    "    cm_norm,\n",
+    "    ax=axes[1],\n",
+    "    cmap='magma',\n",
+    "    cbar=True,\n",
+    "    vmin=0,\n",
+    "    vmax=1,\n",
+    "    xticklabels=label_names,\n",
+    "    yticklabels=label_names,\n",
+    ")\n",
+    "axes[1].set_title('Confusion Matrix (Row-normalized Recall) - Unseen Unit Holdout')\n",
+    "axes[1].set_xlabel('Predicted')\n",
+    "axes[1].set_ylabel('True')\n",
+    "axes[1].tick_params(axis='x', rotation=75)\n",
+    "axes[1].tick_params(axis='y', rotation=0)\n",
+    "\n",
+    "plt.tight_layout()\n",
+    "plt.show()\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Top confusion pairs (off-diagonal)\n",
+    "cm_off = cm_counts.copy()\n",
+    "np.fill_diagonal(cm_off, 0)\n",
+    "\n",
+    "confusions = []\n",
+    "for i in range(cm_off.shape[0]):\n",
+    "    for j in range(cm_off.shape[1]):\n",
+    "        if cm_off[i, j] > 0:\n",
+    "            confusions.append((label_names[i], label_names[j], int(cm_off[i, j])))\n",
+    "\n",
+    "confusions_sorted = sorted(confusions, key=lambda x: x[2], reverse=True)\n",
+    "\n",
+    "if confusions_sorted:\n",
+    "    top_k = min(12, len(confusions_sorted))\n",
+    "    top_conf = confusions_sorted[:top_k]\n",
+    "    pairs = [f\"{a} -> {b}\" for a, b, _ in top_conf]\n",
+    "    vals = [v for _, _, v in top_conf]\n",
+    "\n",
+    "    plt.figure(figsize=(12, 5))\n",
+    "    sns.barplot(x=vals, y=pairs, palette='viridis')\n",
+    "    plt.title('Top Misclassification Directions (Unseen Unit Holdout)')\n",
+    "    plt.xlabel('Number of Errors')\n",
+    "    plt.ylabel('True -> Predicted')\n",
+    "    plt.tight_layout()\n",
+    "    plt.show()\n",
+    "\n",
+    "    print('Top confusion pairs:')\n",
+    "    for a, b, v in top_conf:\n",
+    "        print(f\"  {a} -> {b}: {v}\")\n",
+    "else:\n",
+    "    print('No off-diagonal confusion found.')\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# ROC curves (One-vs-Rest multiclass)\n",
+    "n_classes = len(label_names)\n",
+    "y_true_bin = label_binarize(y_true_u, classes=np.arange(n_classes))\n",
+    "\n",
+    "# Micro-average ROC\n",
+    "fpr_micro, tpr_micro, _ = roc_curve(y_true_bin.ravel(), y_prob_u.ravel())\n",
+    "roc_auc_micro = auc(fpr_micro, tpr_micro)\n",
+    "\n",
+    "# Per-class ROC AUC\n",
+    "aoc = {}\n",
+    "fpr = {}\n",
+    "tpr = {}\n",
+    "for i in range(n_classes):\n",
+    "    fpr[i], tpr[i], _ = roc_curve(y_true_bin[:, i], y_prob_u[:, i])\n",
+    "    aoc[i] = auc(fpr[i], tpr[i])\n",
+    "\n",
+    "# Plot all class curves lightly + highlight weakest 5 classes by F1\n",
+    "f1_per_class = f1_score(y_true_u, y_pred_u, average=None, labels=np.arange(n_classes), zero_division=0)\n",
+    "weakest_idx = np.argsort(f1_per_class)[:5]\n",
+    "\n",
+    "plt.figure(figsize=(10, 8))\n",
+    "for i in range(n_classes):\n",
+    "    plt.plot(fpr[i], tpr[i], color='gray', alpha=0.15)\n",
+    "\n",
+    "for i in weakest_idx:\n",
+    "    plt.plot(fpr[i], tpr[i], linewidth=2, label=f\"{label_names[i]} (AUC={aoc[i]:.3f}, F1={f1_per_class[i]:.3f})\")\n",
+    "\n",
+    "plt.plot(fpr_micro, tpr_micro, linestyle='--', linewidth=3, label=f\"Micro-average ROC (AUC={roc_auc_micro:.3f})\")\n",
+    "plt.plot([0, 1], [0, 1], 'k--', alpha=0.6)\n",
+    "plt.xlim([0.0, 1.0])\n",
+    "plt.ylim([0.0, 1.05])\n",
+    "plt.xlabel('False Positive Rate')\n",
+    "plt.ylabel('True Positive Rate')\n",
+    "plt.title('Multiclass ROC (One-vs-Rest) on Unseen Unit Holdout')\n",
+    "plt.legend(loc='lower right', fontsize=8)\n",
+    "plt.tight_layout()\n",
+    "plt.show()\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Class support vs F1\n",
+    "supports = np.bincount(y_true_u, minlength=len(label_names))\n",
+    "f1_vals = f1_score(y_true_u, y_pred_u, average=None, labels=np.arange(len(label_names)), zero_division=0)\n",
+    "\n",
+    "class_df = pd.DataFrame({\n",
+    "    'intent': label_names,\n",
+    "    'support': supports,\n",
+    "    'f1': f1_vals,\n",
+    "}).sort_values('f1', ascending=True)\n",
+    "\n",
+    "fig, ax1 = plt.subplots(figsize=(12, 8))\n",
+    "ax2 = ax1.twiny()\n",
+    "\n",
+    "ax1.barh(class_df['intent'], class_df['f1'], color='#1f77b4', alpha=0.85)\n",
+    "ax1.set_xlabel('F1-score')\n",
+    "ax1.set_xlim(0, 1)\n",
+    "ax1.set_title('Per-intent F1 with Class Support (Unseen Unit Holdout)')\n",
+    "\n",
+    "ax2.plot(class_df['support'], class_df['intent'], 'o', color='#ff7f0e')\n",
+    "ax2.set_xlabel('Support (# samples)', color='#ff7f0e')\n",
+    "ax2.tick_params(axis='x', colors='#ff7f0e')\n",
+    "\n",
+    "plt.tight_layout()\n",
+    "plt.show()\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Confidence diagnostics: correct vs incorrect + reliability by confidence bins\n",
+    "conf = y_prob_u.max(axis=1)\n",
+    "correct = (y_pred_u == y_true_u)\n",
+    "\n",
+    "plt.figure(figsize=(10, 5))\n",
+    "sns.histplot(conf[correct], color='green', label='Correct', bins=20, stat='density', alpha=0.5)\n",
+    "sns.histplot(conf[~correct], color='red', label='Incorrect', bins=20, stat='density', alpha=0.5)\n",
+    "plt.title('Prediction Confidence Distribution (Unseen Unit Holdout)')\n",
+    "plt.xlabel('Max predicted probability')\n",
+    "plt.ylabel('Density')\n",
+    "plt.legend()\n",
+    "plt.tight_layout()\n",
+    "plt.show()\n",
+    "\n",
+    "bins = np.linspace(0, 1, 11)\n",
+    "bin_ids = np.digitize(conf, bins) - 1\n",
+    "\n",
+    "bin_centers = []\n",
+    "bin_acc = []\n",
+    "bin_conf = []\n",
+    "\n",
+    "for b in range(10):\n",
+    "    idx = bin_ids == b\n",
+    "    if idx.sum() == 0:\n",
+    "        continue\n",
+    "    bin_centers.append((bins[b] + bins[b+1]) / 2)\n",
+    "    bin_acc.append(correct[idx].mean())\n",
+    "    bin_conf.append(conf[idx].mean())\n",
+    "\n",
+    "plt.figure(figsize=(6, 6))\n",
+    "plt.plot([0, 1], [0, 1], 'k--', label='Perfect calibration')\n",
+    "plt.plot(bin_conf, bin_acc, marker='o', label='Model calibration')\n",
+    "plt.xlabel('Mean predicted confidence')\n",
+    "plt.ylabel('Empirical accuracy')\n",
+    "plt.title('Reliability Plot (Unseen Unit Holdout)')\n",
+    "plt.legend()\n",
+    "plt.tight_layout()\n",
+    "plt.show()\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Auto-generated insight summary\n",
+    "report_u = classification_report(\n",
+    "    y_true_u,\n",
+    "    y_pred_u,\n",
+    "    target_names=label_names,\n",
+    "    output_dict=True,\n",
+    "    zero_division=0,\n",
+    ")\n",
+    "\n",
+    "macro_f1 = report_u['macro avg']['f1-score']\n",
+    "weighted_f1 = report_u['weighted avg']['f1-score']\n",
+    "acc = report_u['accuracy']\n",
+    "\n",
+    "per_class_rows = []\n",
+    "for idx, name in enumerate(label_names):\n",
+    "    row = report_u[name]\n",
+    "    per_class_rows.append((name, row['f1-score'], int(supports[idx])))\n",
+    "\n",
+    "worst = sorted(per_class_rows, key=lambda x: x[1])[:5]\n",
+    "best = sorted(per_class_rows, key=lambda x: x[1], reverse=True)[:5]\n",
+    "\n",
+    "print('Project insight summary (Unseen Unit Holdout):')\n",
+    "print(f\"  Accuracy: {acc:.4f}\")\n",
+    "print(f\"  Macro-F1: {macro_f1:.4f}\")\n",
+    "print(f\"  Weighted-F1: {weighted_f1:.4f}\")\n",
+    "\n",
+    "print('\\n  Strongest intents by F1:')\n",
+    "for name, f1v, sup in best:\n",
+    "    print(f\"    {name}: F1={f1v:.3f}, support={sup}\")\n",
+    "\n",
+    "print('\\n  Weakest intents by F1:')\n",
+    "for name, f1v, sup in worst:\n",
+    "    print(f\"    {name}: F1={f1v:.3f}, support={sup}\")\n",
+    "\n",
+    "if 'confusions_sorted' in globals() and confusions_sorted:\n",
+    "    print('\\n  Most frequent confusion directions:')\n",
+    "    for a, b, v in confusions_sorted[:5]:\n",
+    "        print(f\"    {a} -> {b}: {v}\")\n",
+    "\n",
+    "print('\\nInterpretation guide:')\n",
+    "print('  1. If a class has low F1 but decent support, it is semantically overlapping with another intent.')\n",
+    "print('  2. If confidence on wrong samples is high, calibration or threshold-based fallback is needed.')\n",
+    "print('  3. Top confusion pairs suggest where to merge intents or add disambiguating training examples.')\n"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python (torch_env)",
+   "language": "python",
+   "name": "torch_env"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.12.4"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}

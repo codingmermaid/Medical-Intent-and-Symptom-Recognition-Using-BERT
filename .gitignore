@@ -1,0 +1,8 @@
+__pycache__/
+.ipynb_checkpoints/
+runs/
+*.pyc
+.DS_Store
+
+# Local model artifacts (large files)
+model_artifacts/
