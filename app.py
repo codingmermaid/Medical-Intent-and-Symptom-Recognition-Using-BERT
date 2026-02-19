@@ -130,8 +130,6 @@ col_main, col_side = st.columns([2.1, 1], gap="large")
 with col_side:
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.subheader("Model Status")
-    st.write(f"Expected model path: `{MODEL_DIR}`")
-    st.write(f"Hugging Face fallback: `{HF_MODEL_ID or 'not configured'}`")
 
     if "model_reload_token" not in st.session_state:
         st.session_state["model_reload_token"] = 0
@@ -150,12 +148,9 @@ with col_side:
 
     if model is None:
         st.error("Model is not loaded.")
-        st.write(model_error)
+        st.caption("Model is currently unavailable.")
     else:
-        if model_source == "local":
-            st.success("Model loaded from local artifacts.")
-        else:
-            st.success("Model loaded from Hugging Face Hub.")
+        st.success("Model is ready.")
 
     st.write(f"Detected labels: `{len(label_names)}`")
     st.markdown("</div>", unsafe_allow_html=True)
