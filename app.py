@@ -155,41 +155,10 @@ with col_side:
     st.write(f"Detected labels: `{len(label_names)}`")
     st.markdown("</div>", unsafe_allow_html=True)
 
-    with st.expander("How to save your trained model"):
-        st.code(
-            """
-# Run this in your training notebook after training:
-output_dir = "model_artifacts/intent_bert"
-model.save_pretrained(output_dir)
-tokenizer.save_pretrained(output_dir)
-
-import json
-with open(f"{output_dir}/labels.json", "w") as f:
-    json.dump(list(LE.classes_), f)
-            """.strip(),
-            language="python",
-        )
-    with st.expander("Cloud deploy model fallback"):
-        st.markdown(
-            "Set `HF_MODEL_ID` to your Hub repo (for example: `username/medical-intent-bert`). "
-            "You can set it in Streamlit Cloud app settings or `.streamlit/secrets.toml`."
-        )
-
 with col_main:
-    examples = load_examples(DATA_PATH)
-
     st.markdown('<div class="card">', unsafe_allow_html=True)
-    selected = st.selectbox(
-        "Pick an example sentence (optional)",
-        options=[""] + examples,
-        index=0,
-    )
-
     if "symptom_text" not in st.session_state:
         st.session_state["symptom_text"] = ""
-
-    if st.button("Use selected example") and selected:
-        st.session_state["symptom_text"] = selected
 
     st.text_area(
         "Describe what you feel",
